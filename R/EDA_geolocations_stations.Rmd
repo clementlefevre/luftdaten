@@ -18,12 +18,12 @@ library(lubridate)
 
 #load data
 ```{r}
-df_sensors_luftdaten_data <- read_df_from_db('sensors_BB_data')
+
 ```
 
 ```{r}
 tables <- list_tables_from_DB()
-print(tables)
+
 df_dwd_stations <-   read_df_from_db('stations')
 
 df_dwd_PM10 <-  read_df_from_db('data_PM10')
@@ -42,7 +42,7 @@ df_sensors_BB <- read_df_from_db('sensors_BB')
 # map
 ```{r}
 m <- leaflet() %>% setView(lng = 13.3493, lat = 52.5430, zoom = 7)
-m %>% addProviderTiles(providers$Stamen.Toner) %>%   addCircleMarkers(data = df_dwd_stations,lng = ~longitude,lat = ~latitude,radius=6,label = ~paste(idx,name,sep = ' - '),stroke = TRUE, fillOpacity = 1) %>%   addCircleMarkers(data = df_sensors_BB,lng = ~location_longitude,lat = ~location_latitude,radius=3,stroke = FALSE, color='red',fillOpacity = 1,label = ~as.character(sensor_id))
+m %>% addProviderTiles(providers$Stamen.Toner) %>%   addCircleMarkers(data = df_dwd_stations,lng = ~longitude,lat = ~latitude,radius=6,label = ~paste(idx,name,sep = ' - '),stroke = TRUE, fillOpacity = 1) %>%   addCircleMarkers(data = df_sensors_BB,lng = ~location_longitude,lat = ~location_latitude,radius=3,stroke = FALSE, color='red',fillOpacity = 1,label = ~paste0('location_id: ',as.character(location_id)))
 ```
 
 ## combine DWD data with Luftdaten on PM10
@@ -54,10 +54,7 @@ m %>% addProviderTiles(providers$Stamen.Toner) %>%   addCircleMarkers(data = df_
 prepare.data <- function(dwdStationCode,location.id){
   
 
-sensor_selected <-df_sensors_BB %>% filter(location_id==location) %>% pull(sensor_id) 
-
-
-df<- df_sensors_luftdaten_data %>% filter(sensor_id %in% sensor_selected) 
+df <- load.luftdaten.data(location.id)
 df$datetime <- ymd_hms(df$datehour)
 df <- df %>% select(sensor_id,datetime,value,variable)
 
@@ -75,7 +72,8 @@ return (df)
 
 ## select specific sensor
 ```{r}
-df <- prepare.data('DEBE010',5879)
+df_sensors_luftdaten_data <- load.luftdaten.data(c(8374))
+df <- prepare.data('DEBE010',c(8374))
 
 
 spreado <- df  %>% select(-sensor_id) %>% spread(variable,value)
@@ -83,8 +81,6 @@ spreado <- df  %>% select(-sensor_id) %>% spread(variable,value)
 
 
 ```{r}
-
-
 p<-ggplot(df,aes(datetime,value,color=variable))+ geom_line(size=.2)+scale_color_hue() +
  theme_minimal()
 ggplotly(p)
@@ -95,3 +91,8 @@ p<-ggplot(spreado,aes(temperature,humidity,color=P1))+geom_point()
 ggplotly(p)
 ```
 
+#
+```{r}
+
+
+```

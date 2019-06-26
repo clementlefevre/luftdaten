@@ -37,3 +37,5 @@ vignettes/*.pdf
 *.nb.html
 
 data/
+.ipynb_checkpoints/
+__pycache__/

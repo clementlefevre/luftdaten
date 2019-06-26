@@ -14,7 +14,7 @@ connect_to_db <- function(){
       return(con)
     },
     error=function(cond) {
-      message(paste("could open DB connection", filename))
+      message(paste("could open DB connection", DB.NAME))
       return(NULL)
     }
   )
@@ -42,7 +42,20 @@ read_df_from_db <- function(tableName){
 
 list_tables_from_DB <- function(){
   con <- connect_to_db()
-  return (dbListTables(con))
+  table.list <- dbListTables(con)
+    dbDisconnect(con) 
+  return (table.list)
+}
+
+load.luftdaten.data <- function(locations_id){
+  con <- connect_to_db()
+  sensors_on_location <-  dbGetQuery(con, 'SELECT sensor_id FROM sensors_BB WHERE "location_id" in (:x)', 
+                                     params = list(x = locations_id)) %>% pull(sensor_id)
+  df_luftdaten <- dbGetQuery(con, 'SELECT * FROM sensors_BB_data WHERE sensor_id IN (:x)', 
+                             params = list(x = sensors_on_location))
+  
+  dbDisconnect(con) 
+  return(df_luftdaten)
 }
 
 
