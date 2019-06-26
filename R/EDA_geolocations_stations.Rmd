@@ -1,0 +1,97 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(tidyverse)
+library(plotly)
+library(leaflet)
+source('loadData.R')
+library(lubridate)
+```
+
+
+#load data
+```{r}
+df_sensors_luftdaten_data <- read_df_from_db('sensors_BB_data')
+```
+
+```{r}
+tables <- list_tables_from_DB()
+print(tables)
+df_dwd_stations <-   read_df_from_db('stations')
+
+df_dwd_PM10 <-  read_df_from_db('data_PM10')
+df_dwd_PM10$datetime <- dmy_hm(df_dwd_PM10$Zeit)
+df_dwd_PM10 <- df_dwd_PM10 %>% select(Stationscode,datetime,Messwert..in.µg.m..) %>% rename(value=Messwert..in.µg.m..,sensor_id=Stationscode)
+df_dwd_PM10$value<-as.numeric(df_dwd_PM10$value)
+df_dwd_PM10$variable <- "PM10"
+colnames(df_dwd_PM10)<- c("sensor_id" ,"datetime" , "value"  ,   "variable" )
+
+stations_PM10 <- unique(df_dwd_PM10$Stationscode)
+df_dwd_stations <- df_dwd_stations %>% filter(idx %in% stations_PM10)
+df_sensors_BB <- read_df_from_db('sensors_BB')
+```
+
+
+# map
+```{r}
+m <- leaflet() %>% setView(lng = 13.3493, lat = 52.5430, zoom = 7)
+m %>% addProviderTiles(providers$Stamen.Toner) %>%   addCircleMarkers(data = df_dwd_stations,lng = ~longitude,lat = ~latitude,radius=6,label = ~paste(idx,name,sep = ' - '),stroke = TRUE, fillOpacity = 1) %>%   addCircleMarkers(data = df_sensors_BB,lng = ~location_longitude,lat = ~location_latitude,radius=3,stroke = FALSE, color='red',fillOpacity = 1,label = ~as.character(sensor_id))
+```
+
+## combine DWD data with Luftdaten on PM10
+
+
+#
+```{r}
+
+prepare.data <- function(dwdStationCode,location.id){
+  
+
+sensor_selected <-df_sensors_BB %>% filter(location_id==location) %>% pull(sensor_id) 
+
+
+df<- df_sensors_luftdaten_data %>% filter(sensor_id %in% sensor_selected) 
+df$datetime <- ymd_hms(df$datehour)
+df <- df %>% select(sensor_id,datetime,value,variable)
+
+df$sensor_id <- as.character(df$sensor_id)
+
+df <- bind_rows(df_dwd_PM10 %>% filter(sensor_id==dwdStationCode),df) %>%  distinct(sensor_id,datetime,variable, .keep_all = TRUE)
+
+start.data <-  df %>% filter(variable=='P1') %>% pull(datetime)
+df <- df %>% filter(datetime>=min(start.data))
+
+return (df)
+}
+
+```
+
+## select specific sensor
+```{r}
+df <- prepare.data('DEBE010',5879)
+
+
+spreado <- df  %>% select(-sensor_id) %>% spread(variable,value)
+```
+
+
+```{r}
+
+
+p<-ggplot(df,aes(datetime,value,color=variable))+ geom_line(size=.2)+scale_color_hue() +
+ theme_minimal()
+ggplotly(p)
+```
+
+```{r}
+p<-ggplot(spreado,aes(temperature,humidity,color=P1))+geom_point()
+ggplotly(p)
+```
+

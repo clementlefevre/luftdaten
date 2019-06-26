@@ -1,0 +1,68 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+
+library(plotly)
+library(ggplot2)
+library(zoo)
+source('loadData.R')
+
+df <-  read_df_from_db('data_PM10')
+
+df <- df %>%
+ filter(Netzwerk %in% "BE")
+
+df$datetime <- dmy_hm(df$Zeit)
+
+df$Year <- year(df$datetime)
+
+year.start <-2017
+
+
+df <- df %>% mutate(datetime.shifted = datetime-lubridate::years(Year-year.start))
+
+df$Messwert..in.µg.m.. <- as.numeric(df$Messwert..in.µg.m..)
+df <- df %>% filter(Messwert..in.µg.m..<60)
+
+
+ggplot(df) +
+ aes(x = datetime.shifted, y = Messwert..in.µg.m.., colour = Year, group = Year) +
+ geom_line(size = .5) +facet_grid(.~Stationsname)
+ #scale_color_hue() +
+ #theme_minimal()
+
+```
+## aggregate per day
+```{r}
+df.day <- df %>% mutate(date=as.Date(datetime)) %>% group_by(date,Stationscode,Stationsname)%>% summarise(mean_value = mean(as.numeric(Messwert..in.µg.m..,na.rm=T))) 
+
+df.day$Year <- year(df.day$date)
+
+df.day <- df.day %>% filter(Year>2016)
+
+df.day <- df.day %>% mutate(date.shifted = date-lubridate::years(Year-year.start))
+
+df.day$ma_value <-           rollmean(
+            df.day$mean_value,
+            k = 7*1,
+            fill = NA,
+            na.rm = TRUE
+          )
+
+
+p <-ggplot(df.day %>% filter(Stationscode=='DEBE065'))+
+ aes(x = date.shifted , y = ma_value, colour = as.factor(Year), group = Year) +
+ geom_line(size = .5) +facet_grid(Stationsname~.)  +scale_color_hue() +
+ theme_minimal()
+
+ggplotly(p)
+
+```
+
