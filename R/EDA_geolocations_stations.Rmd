@@ -17,32 +17,34 @@ library(lubridate)
 
 
 #load data
-```{r}
 
-```
 
 ```{r}
 tables <- list_tables_from_DB()
+print(tables)
 
-df_dwd_stations <-   read_df_from_db('stations')
 
-df_dwd_PM10 <-  read_df_from_db('data_PM10')
-df_dwd_PM10$datetime <- dmy_hm(df_dwd_PM10$Zeit)
-df_dwd_PM10 <- df_dwd_PM10 %>% select(Stationscode,datetime,Messwert..in.µg.m..) %>% rename(value=Messwert..in.µg.m..,sensor_id=Stationscode)
-df_dwd_PM10$value<-as.numeric(df_dwd_PM10$value)
-df_dwd_PM10$variable <- "PM10"
+df_dwd_PM10 <-  read_df_from_db('dwd_data_1H')
+df_dwd_PM10 <- df_dwd_PM10 %>% filter(pollutant=='PM10') %>% rename(variable=pollutant,sensor_id=station_code)
+df_dwd_PM10$datetime <- dmy_hm(df_dwd_PM10$datehour)
+df_dwd_PM10 <- df_dwd_PM10 %>% select(sensor_id,datetime,value,variable) 
+
+
+stations_PM10 <- unique(df_dwd_PM10$sensor_id)
 colnames(df_dwd_PM10)<- c("sensor_id" ,"datetime" , "value"  ,   "variable" )
 
-stations_PM10 <- unique(df_dwd_PM10$Stationscode)
+df_dwd_stations <-   read_df_from_db('stations')
 df_dwd_stations <- df_dwd_stations %>% filter(idx %in% stations_PM10)
-df_sensors_BB <- read_df_from_db('sensors_BB')
+df_sensors_luftdaten <- read_df_from_db('sensors_luftdaten') %>% filter(sensor_type_id!=9 & sensor_type_id!=14)
+
+df_sensors_luftdaten<- df_sensors_luftdaten %>% mutate_at(c('location_latitude','location_longitude','location_altitude'),as.numeric)
 ```
 
 
 # map
 ```{r}
 m <- leaflet() %>% setView(lng = 13.3493, lat = 52.5430, zoom = 7)
-m %>% addProviderTiles(providers$Stamen.Toner) %>%   addCircleMarkers(data = df_dwd_stations,lng = ~longitude,lat = ~latitude,radius=6,label = ~paste(idx,name,sep = ' - '),stroke = TRUE, fillOpacity = 1) %>%   addCircleMarkers(data = df_sensors_BB,lng = ~location_longitude,lat = ~location_latitude,radius=3,stroke = FALSE, color='red',fillOpacity = 1,label = ~paste0('location_id: ',as.character(location_id)))
+m %>% addProviderTiles(providers$Stamen.Toner) %>%   addCircleMarkers(data = df_dwd_stations,lng = ~longitude,lat = ~latitude,radius=6,label = ~paste(idx,name,sep = ' - '),stroke = TRUE, fillOpacity = 1) %>%   addCircleMarkers(data = df_sensors_luftdaten,lng = ~location_longitude,lat = ~location_latitude,radius=3,stroke = FALSE, color='red',fillOpacity = 1,label = ~paste0('location_id: ',as.character(location_id)))
 ```
 
 ## combine DWD data with Luftdaten on PM10
@@ -57,7 +59,6 @@ prepare.data <- function(dwdStationCode,location.id){
 df <- load.luftdaten.data(location.id)
 df$datetime <- ymd_hms(df$datehour)
 df <- df %>% select(sensor_id,datetime,value,variable)
-
 df$sensor_id <- as.character(df$sensor_id)
 
 df <- bind_rows(df_dwd_PM10 %>% filter(sensor_id==dwdStationCode),df) %>%  distinct(sensor_id,datetime,variable, .keep_all = TRUE)
@@ -72,27 +73,35 @@ return (df)
 
 ## select specific sensor
 ```{r}
-df_sensors_luftdaten_data <- load.luftdaten.data(c(8374))
-df <- prepare.data('DEBE010',c(8374))
 
+df <- prepare.data('DEBB067',c(10507))
 
 spreado <- df  %>% select(-sensor_id) %>% spread(variable,value)
 ```
 
 
 ```{r}
-p<-ggplot(df,aes(datetime,value,color=variable))+ geom_line(size=.2)+scale_color_hue() +
- theme_minimal()
+p<-ggplot(df,aes(datetime,value,color=variable))+ geom_line(size=.2)+ theme_minimal()
 ggplotly(p)
 ```
 
 ```{r}
-p<-ggplot(spreado,aes(temperature,humidity,color=P1))+geom_point()
+library(viridis)
+p<-ggplot(spreado,aes(humidity,log(PM10/P1+1),color=temperature,alpha=.5))+geom_point()+scale_color_viridis("Temp C")
+ggplotly(p)
+```
+
+```{r}
+p<-ggplot(spreado,aes(P1,PM10,color=humidity,alpha=.5))+geom_point()+scale_color_viridis("Humidity %")+ geom_abline(intercept = 0, slope = 1)+ geom_smooth()
 ggplotly(p)
 ```
 
 #
 ```{r}
 
-
+data.df <- spreado %>% filter(!is.na(P1) & !is.na(PM10))
+fit <- lm(data=data.df,P1~humidity+temperature+PM10)
+prediction <- predict(fit)
+data.df$predicted <- predict(fit)
+ggplot(data.df,aes(P1,predicted,color=humidity))+ geom_point()
 ```
