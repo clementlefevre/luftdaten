@@ -27,9 +27,8 @@ read_df_from_db <- function(tableName){
     {
       df <- (dbReadTable(con,tableName))
       dbDisconnect(con)
-      #df$timestamp <- as.POSIXct(df$timestamp,  origin="1970-01-01", tz = 'CET')
-      #df$datetime <- dmy_hm(df$Zeit)
-     
+
+  
       return (df)
     },
     error=function(cond) {
@@ -40,9 +39,9 @@ read_df_from_db <- function(tableName){
   ) 
 }
 
-writeToDB<- function(df,tableName){
+writeToDB<- function(df,tableName,overwrite=T){
   con <- connect_to_db()
-    dbWriteTable(con, tableName, df)
+    dbWriteTable(con, tableName, df,overwrite=overwrite)
     dbDisconnect(con)
 }
 
@@ -64,6 +63,16 @@ load.luftdaten.data <- function(locations_id){
   return(df_luftdaten)
 }
 
+load.dwd.data <- function(station_code){
+  con <- connect_to_db()
+  dwd.data <-  dbGetQuery(con, 'SELECT * from dwd_data_1H WHERE "station_code" LIKE (:x)', 
+                                     params = list(x = station_code)) 
+
+  
+  dbDisconnect(con) 
+  return(dwd.data)
+}
+
 load.dwd.stations.geo <- function(pollutant){
   pollutant<- 'PM10'
   print(pollutant)
@@ -71,7 +80,7 @@ load.dwd.stations.geo <- function(pollutant){
   dwd.stations.idx <- dbGetQuery(con, 'SELECT  DISTINCT station_code FROM dwd_data_1H WHERE "pollutant" LIKE :x', 
              params = list(x = pollutant)) %>% pull(station_code)
    
-  dwd.stations.location <- dbGetQuery(con, 'SELECT  idx,longitude,latitude  FROM stations WHERE "idx" IN (:x)', 
+  dwd.stations.location <- dbGetQuery(con, 'SELECT  *  FROM stations WHERE "idx" IN (:x)', 
                                       params = list(x = dwd.stations.idx))
   
   dbDisconnect(con) 

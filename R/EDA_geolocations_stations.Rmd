@@ -11,73 +11,60 @@ Try executing this chunk by clicking the *Run* button within the chunk or by pla
 library(tidyverse)
 library(plotly)
 library(leaflet)
-source('loadData.R')
+source('db_service.R')
 library(lubridate)
 ```
 
 
 #load data
 
+```{r}
+# 1- we need a list of DWD stations with coordinates for PM10:
+dwd.stations<- load.dwd.stations.geo('PM10')
+
+# 2 we need the list of sensors with the nearest dwd station infos:
+luftdaten.sensors<- read_df_from_db('sensors_luftdaten') %>% filter(sensor_type_id==14 | sensor_type_id==17)
+
+# 3 load proximity table and add to luftdaten_sensors
+proximity <- read_df_from_db('luftdaten_dwd_nearest_station')
+
+luftdaten.sensors <- merge(luftdaten.sensors,proximity,by='location_id',all.x=T)
+luftdaten.sensors <- luftdaten.sensors%>% mutate_at(c('location_longitude','location_latitude','location_altitude'),as.numeric)
+
+luftdaten.sensors$location_latitude_jitter <- jitter(luftdaten.sensors$location_latitude,factor= 0.01)
+luftdaten.sensors$location_longitude_jitter <- jitter(luftdaten.sensors$location_longitude,factor= 0.01)
+```
+
+
+# map
+```{r}
+
+pal <- colorFactor(
+  palette = "Spectral",
+  domain = luftdaten.sensors$sensor_type_id)
+
+m <- leaflet() %>% setView(lng = 13.3493, lat = 52.5430, zoom = 7)
+m %>% addProviderTiles(providers$Stamen.Toner) %>%   addCircleMarkers(data = dwd.stations,lng = ~longitude,lat = ~latitude,radius=6,label = ~paste(idx,name,sep = ' - '),stroke = TRUE, fillOpacity = 1) %>%   addCircleMarkers(data = luftdaten.sensors,lng = ~location_longitude_jitter,lat = ~location_latitude_jitter,radius=5,stroke = FALSE, color=~pal(sensor_type_id),fillOpacity = 1,label = ~paste0('location_id: ',as.character(location_id)))
+```
+
 
 ```{r}
-tables <- list_tables_from_DB()
-print(tables)
-
 
 df_dwd_PM10 <-  read_df_from_db('dwd_data_1H')
 df_dwd_PM10 <- df_dwd_PM10 %>% filter(pollutant=='PM10') %>% rename(variable=pollutant,sensor_id=station_code)
 df_dwd_PM10$datetime <- dmy_hm(df_dwd_PM10$datehour)
 df_dwd_PM10 <- df_dwd_PM10 %>% select(sensor_id,datetime,value,variable) 
 
-
 stations_PM10 <- unique(df_dwd_PM10$sensor_id)
 colnames(df_dwd_PM10)<- c("sensor_id" ,"datetime" , "value"  ,   "variable" )
 
 df_dwd_stations <-   read_df_from_db('stations')
 df_dwd_stations <- df_dwd_stations %>% filter(idx %in% stations_PM10)
-df_sensors_luftdaten <- read_df_from_db('sensors_luftdaten') %>% filter(sensor_type_id!=9 & sensor_type_id!=14)
+df_sensors_luftdaten <- read_df_from_db('sensors_luftdaten') %>% filter(sensor_type_id==14 | sensor_type_id==17)
 
 df_sensors_luftdaten<- df_sensors_luftdaten %>% mutate_at(c('location_latitude','location_longitude','location_altitude'),as.numeric)
 ```
-## find nearest DWD Stations :
 
-```{r}
-library(geosphere)
-set1<- df_sensors_luftdaten %>% select(location_longitude,location_latitude) # %>% as.matrix
-set2<- df_dwd_stations %>% select(longitude,latitude)  #%>% as.matrix
-
-get.distance <-  function(p1,p2) {
-    dst <- distm(p1, p2, fun = distHaversine)
-    return(dst)
-}
-
-#dist.mini <- function(y) min(apply(set2, 1, function(x) min(get.distance (x,y))))
-
-#dist.mini.idx <- function(y) which.min(apply(set2, 1, function(x) min(get.distance (x,y))))
-dist.mini.idx <- function(y) which.min(apply(set2, 1, function(x) min(distHaversine(x,y))))
-
-# very long to compute, must compute distance between each sensors and each dwd station
-mini.idx.result <- apply(set1, 1, dist.mini.idx )
-
-df_sensors_luftdaten$idx.nearest.dwd <- mini.idx.result
-df_dwd_stations <- df_dwd_stations %>% mutate(id = row_number())
-df_sensors_luftdaten <- merge(df_sensors_luftdaten,df_dwd_stations,by.x='idx.nearest.dwd',by.y='id')
-
-coord.sensors <- df_sensors_luftdaten%>% select(location_longitude,location_latitude) 
-coord.dwd <- df_sensors_luftdaten %>% select(longitude,latitude)
-df_sensors_luftdaten$distance.to.dwd<-distHaversine(coord.sensors,coord.dwd)
-
-```
-
-
-
-
-
-# map
-```{r}
-m <- leaflet() %>% setView(lng = 13.3493, lat = 52.5430, zoom = 7)
-m %>% addProviderTiles(providers$Stamen.Toner) %>%   addCircleMarkers(data = df_dwd_stations,lng = ~longitude,lat = ~latitude,radius=6,label = ~paste(idx,name,sep = ' - '),stroke = TRUE, fillOpacity = 1) %>%   addCircleMarkers(data = df_sensors_luftdaten,lng = ~location_longitude,lat = ~location_latitude,radius=3,stroke = FALSE, color='red',fillOpacity = 1,label = ~paste0('location_id: ',as.character(location_id)))
-```
 
 ## combine DWD data with Luftdaten on PM10
 
@@ -87,26 +74,29 @@ m %>% addProviderTiles(providers$Stamen.Toner) %>%   addCircleMarkers(data = df_
 
 prepare.data <- function(dwdStationCode,location.id){
 
-df <- load.luftdaten.data(location.id)
-df$datetime <- ymd_hms(df$datehour)
-df <- df %>% select(sensor_id,datetime,value,variable)
-df$sensor_id <- as.character(df$sensor_id)
+df.luftdaten <- load.luftdaten.data(location.id)
+df.luftdaten$datetime <- ymd_hms(df.luftdaten$datehour)
+df.luftdaten <- df.luftdaten %>% select(sensor_id,datetime,value,variable)
+df.luftdaten$sensor_id <- as.character(df.luftdaten$sensor_id)
 
-df <- bind_rows(df_dwd_PM10 %>% filter(sensor_id==dwdStationCode),df) %>%  distinct(sensor_id,datetime,variable, .keep_all = TRUE)
+df.dwd <- load.dwd.data(dwdStationCode)
+df.dwd<- df.dwd %>% rename(sensor_id=station_code,variable=pollutant)
+df.dwd$datetime <-  dmy_hm(df.dwd$datehour)
+
+df <- bind_rows(df.dwd,df.luftdaten) %>%  distinct(sensor_id,datetime,variable, .keep_all = TRUE)
 
 start.data <-  df %>% filter(variable=='P1') %>% pull(datetime)
 df <- df %>% filter(datetime>=min(start.data))
 
-return (df)
+return (df %>% select(-datehour))
 }
 
 ```
 
 ## select specific sensor
 ```{r}
-
+df.dwd <- load.dwd.data('DERP010')
 df <- prepare.data('DERP010',c(10621))
-
 spreado <- df  %>% select(-sensor_id) %>% spread(variable,value)
 ```
 

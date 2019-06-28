@@ -1,9 +1,9 @@
 library(geosphere)
 
-source('loadData.R')
+source('db_service.R')
 
 
-update_proximity_table<- function(luftdaten.geo,dwd.stations.geo ){
+compute_proximity_table<- function(luftdaten.geo,dwd.stations.geo ){
   
 
   dwd.stations.geo <-  dwd.stations.geo %>% mutate(row.id =row_number())
@@ -31,12 +31,17 @@ update_proximity_table<- function(luftdaten.geo,dwd.stations.geo ){
 }
 
 
-dwd.stations.geo <- load.dwd.stations.geo('PM10')
-luftdaten.geo<- load.luftdaten.geo()
+updateNearestDwdStation <- function(){
+  dwd.stations.geo <- load.dwd.stations.geo('PM10')
+  luftdaten.geo<- load.luftdaten.geo()
+  
+  df<- compute_proximity_table(luftdaten.geo,dwd.stations.geo)
+  
+  df.to.save <- df %>% select(location_id,idx,distance.to.dwd) %>% rename(dwd_station_id = idx)
+  
+  writeToDB(df = df.to.save,tableName = 'luftdaten_dwd_nearest_station', overwrite=T) 
+}
 
-df<- update_proximity_table(luftdaten.geo,dwd.stations.geo)
-
-writeToDB(df = df,tableName = 'luftdaten_dwd_nearest_station')
 
 
 
