@@ -39,6 +39,37 @@ df_sensors_luftdaten <- read_df_from_db('sensors_luftdaten') %>% filter(sensor_t
 
 df_sensors_luftdaten<- df_sensors_luftdaten %>% mutate_at(c('location_latitude','location_longitude','location_altitude'),as.numeric)
 ```
+## find nearest DWD Stations :
+
+```{r}
+library(geosphere)
+set1<- df_sensors_luftdaten %>% select(location_longitude,location_latitude) # %>% as.matrix
+set2<- df_dwd_stations %>% select(longitude,latitude)  #%>% as.matrix
+
+get.distance <-  function(p1,p2) {
+    dst <- distm(p1, p2, fun = distHaversine)
+    return(dst)
+}
+
+#dist.mini <- function(y) min(apply(set2, 1, function(x) min(get.distance (x,y))))
+
+dist.mini.idx <- function(y) which.min(apply(set2, 1, function(x) min(get.distance (x,y))))
+
+# very long to compute, must compute distance between each sensors and each dwd station
+mini.idx.result <- apply(set1, 1, dist.mini.idx )
+
+df_sensors_luftdaten$idx.nearest.dwd <- mini.idx.result
+df_dwd_stations <- df_dwd_stations %>% mutate(id = row_number())
+df_sensors_luftdaten <- merge(df_sensors_luftdaten,df_dwd_stations,by.x='idx.nearest.dwd',by.y='id')
+
+coord.sensors <- df_sensors_luftdaten%>% select(location_longitude,location_latitude) 
+coord.dwd <- df_sensors_luftdaten %>% select(longitude,latitude)
+df_sensors_luftdaten$distance.to.dwd<-distHaversine(coord.sensors,coord.dwd)
+
+```
+
+
+
 
 
 # map
@@ -54,7 +85,6 @@ m %>% addProviderTiles(providers$Stamen.Toner) %>%   addCircleMarkers(data = df_
 ```{r}
 
 prepare.data <- function(dwdStationCode,location.id){
-  
 
 df <- load.luftdaten.data(location.id)
 df$datetime <- ymd_hms(df$datehour)
@@ -74,7 +104,7 @@ return (df)
 ## select specific sensor
 ```{r}
 
-df <- prepare.data('DEBB067',c(10507))
+df <- prepare.data('DERP010',c(10621))
 
 spreado <- df  %>% select(-sensor_id) %>% spread(variable,value)
 ```
@@ -92,16 +122,41 @@ ggplotly(p)
 ```
 
 ```{r}
-p<-ggplot(spreado,aes(P1,PM10,color=humidity,alpha=.5))+geom_point()+scale_color_viridis("Humidity %")+ geom_abline(intercept = 0, slope = 1)+ geom_smooth()
+p<-ggplot(spreado %>% filter(humidity>70),aes(P1,PM10,color=humidity,alpha=.5))+geom_point()+scale_color_viridis("Humidity %")+ geom_abline(intercept = 0, slope = 1)+ geom_smooth()+ geom_abline()
 ggplotly(p)
 ```
 
 #
 ```{r}
-
-data.df <- spreado %>% filter(!is.na(P1) & !is.na(PM10))
+library(randomForest)
+data.df <- spreado %>% filter(!is.na(P1) & !is.na(PM10)) #%>% filter(humidity>70)
 fit <- lm(data=data.df,P1~humidity+temperature+PM10)
-prediction <- predict(fit)
-data.df$predicted <- predict(fit)
-ggplot(data.df,aes(P1,predicted,color=humidity))+ geom_point()
+print(summary(fit))
+
+data.df$predicted.lm <- predict(fit)
+ggplot(data.df,aes(P1,predicted.lm,color=humidity))+ geom_point()+geom_abline(intercept = 0)
 ```
+```{r}
+model.rf <- randomForest(P1~humidity+temperature+PM10, data = data.df, ntree = 500, na.action = na.omit)
+
+data.df$predicted.rf <- predict(model.rf)
+ggplot(data.df,aes(predicted.lm,predicted.rf,color=humidity))+ geom_point()+ geom_abline(intercept = 0)
+```
+
+## Hähnel
+
+```{r}
+rh <- data.df$humidity/100
+data.df$haehnel <- data.df$P1*((1-rh)^.01)
+
+ggplot(data.df,aes(PM10,haehnel))+ geom_point()+ geom_abline(intercept = 0)
+```
+
+```{r}
+ggplot(data.df,aes(haehnel,PM10,color=humidity))+ geom_point()+ geom_abline(intercept = 0)
+humidity.x <-seq(0,1,1/100)
+df.rh <- data.frame(rh=humidity.x)
+df.rh$haehnel <- (1-df.rh$rh)^.6
+ggplot(df.rh,aes(rh,haehnel))+ geom_point()
+```
+
