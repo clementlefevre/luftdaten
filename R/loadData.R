@@ -40,6 +40,12 @@ read_df_from_db <- function(tableName){
   ) 
 }
 
+writeToDB<- function(df,tableName){
+  con <- connect_to_db()
+    dbWriteTable(con, tableName, df)
+    dbDisconnect(con)
+}
+
 list_tables_from_DB <- function(){
   con <- connect_to_db()
   table.list <- dbListTables(con)
@@ -56,6 +62,30 @@ load.luftdaten.data <- function(locations_id){
   
   dbDisconnect(con) 
   return(df_luftdaten)
+}
+
+load.dwd.stations.geo <- function(pollutant){
+  pollutant<- 'PM10'
+  print(pollutant)
+  con <- connect_to_db()
+  dwd.stations.idx <- dbGetQuery(con, 'SELECT  DISTINCT station_code FROM dwd_data_1H WHERE "pollutant" LIKE :x', 
+             params = list(x = pollutant)) %>% pull(station_code)
+   
+  dwd.stations.location <- dbGetQuery(con, 'SELECT  idx,longitude,latitude  FROM stations WHERE "idx" IN (:x)', 
+                                      params = list(x = dwd.stations.idx))
+  
+  dbDisconnect(con) 
+  return(dwd.stations.location)
+  
+}
+
+load.luftdaten.geo <- function(){
+  
+  con <- connect_to_db()
+  luftdaten.locations <- dbGetQuery(con, 'SELECT DISTINCT location_id,location_latitude,location_longitude FROM sensors_luftdaten')
+  dbDisconnect(con) 
+  luftdaten.locations <- luftdaten.locations %>% mutate_at(c('location_longitude','location_latitude'),as.numeric)
+  return(luftdaten.locations)
 }
 
 drop.table<- function(tableName){

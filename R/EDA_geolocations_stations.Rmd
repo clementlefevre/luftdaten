@@ -53,7 +53,8 @@ get.distance <-  function(p1,p2) {
 
 #dist.mini <- function(y) min(apply(set2, 1, function(x) min(get.distance (x,y))))
 
-dist.mini.idx <- function(y) which.min(apply(set2, 1, function(x) min(get.distance (x,y))))
+#dist.mini.idx <- function(y) which.min(apply(set2, 1, function(x) min(get.distance (x,y))))
+dist.mini.idx <- function(y) which.min(apply(set2, 1, function(x) min(distHaversine(x,y))))
 
 # very long to compute, must compute distance between each sensors and each dwd station
 mini.idx.result <- apply(set1, 1, dist.mini.idx )
