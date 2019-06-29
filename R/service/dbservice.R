@@ -52,10 +52,10 @@ list_tables_from_DB <- function(){
   return (table.list)
 }
 
-load.luftdaten.data <- function(locations_id){
+load.luftdaten.data <- function(sensors_on_location){
+  print(sensors_on_location)
   con <- connect_to_db()
-  sensors_on_location <-  dbGetQuery(con, 'SELECT sensor_id FROM sensors_luftdaten WHERE "location_id" in (:x)', 
-                                     params = list(x = locations_id)) %>% pull(sensor_id)
+
   df_luftdaten <- dbGetQuery(con, 'SELECT * FROM sensors_luftdaten_data WHERE sensor_id IN (:x)', 
                              params = list(x = sensors_on_location))
   
@@ -90,11 +90,33 @@ load.dwd.stations.geo <- function(pollutant){
 
 load.luftdaten.geo <- function(){
   
-  con <- connect_to_db()
+  
   luftdaten.locations <- dbGetQuery(con, 'SELECT DISTINCT location_id,location_latitude,location_longitude FROM sensors_luftdaten')
   dbDisconnect(con) 
   luftdaten.locations <- luftdaten.locations %>% mutate_at(c('location_longitude','location_latitude'),as.numeric)
   return(luftdaten.locations)
+}
+
+load.luftdaten.sensors <- function(){
+  con <- connect_to_db()
+  luftdaten.sensors <- dbGetQuery(con, 'SELECT DISTINCT * from sensors_luftdaten s WHERE s.sensor_id  IN (SELECT DISTINCT sensor_id FROM sensors_luftdaten_data)')
+  luftdaten.sensors <- luftdaten.sensors %>% filter(sensor_type_id==14 | sensor_type_id==17)
+  
+  
+  proximity <- read_df_from_db('luftdaten_dwd_nearest_station')
+  
+  luftdaten.sensors <- merge(luftdaten.sensors,proximity,by='location_id',all.x=T)
+  luftdaten.sensors <- luftdaten.sensors%>% mutate_at(c('location_longitude','location_latitude','location_altitude'),as.numeric)
+  
+  luftdaten.sensors$location_latitude_jitter <- jitter(luftdaten.sensors$location_latitude,factor= 0.01)
+  luftdaten.sensors$location_longitude_jitter <- jitter(luftdaten.sensors$location_longitude,factor= 0.01)
+  
+  luftdaten.sensors <- luftdaten.sensors %>% arrange(distance.to.dwd)
+  
+  
+  
+  dbDisconnect(con)
+  return (luftdaten.sensors)
 }
 
 drop.table<- function(tableName){

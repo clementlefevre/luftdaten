@@ -1,6 +1,5 @@
 library(geosphere)
 
-source('db_service.R')
 
 
 compute_proximity_table<- function(luftdaten.geo,dwd.stations.geo ){
@@ -40,6 +39,26 @@ updateNearestDwdStation <- function(){
   df.to.save <- df %>% select(location_id,idx,distance.to.dwd) %>% rename(dwd_station_id = idx)
   
   writeToDB(df = df.to.save,tableName = 'luftdaten_dwd_nearest_station', overwrite=T) 
+}
+
+prepare.data <- function(dwdStationCode,sensors_id){
+ 
+  df.luftdaten <- load.luftdaten.data(sensors_id)
+  
+  df.luftdaten$datetime <- ymd_hms(df.luftdaten$datehour)
+  df.luftdaten <- df.luftdaten %>% select(sensor_id,datetime,value,variable)
+  df.luftdaten$sensor_id <- as.character(df.luftdaten$sensor_id)
+  
+  df.dwd <- load.dwd.data(dwdStationCode)
+  df.dwd<- df.dwd %>% rename(sensor_id=station_code,variable=pollutant)
+  df.dwd$datetime <-  dmy_hm(df.dwd$datehour)
+  
+  df <- bind_rows(df.dwd,df.luftdaten) %>%  distinct(sensor_id,datetime,variable, .keep_all = TRUE)
+  
+  start.data <-  df %>% filter(variable=='P1') %>% pull(datetime)
+  df <- df %>% filter(datetime>=min(start.data))
+  
+  return (df %>% select(-datehour))
 }
 
 

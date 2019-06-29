@@ -11,7 +11,8 @@ Try executing this chunk by clicking the *Run* button within the chunk or by pla
 library(tidyverse)
 library(plotly)
 library(leaflet)
-source('db_service.R')
+source('service/db_service.R')
+
 library(lubridate)
 ```
 
@@ -48,55 +49,20 @@ m %>% addProviderTiles(providers$Stamen.Toner) %>%   addCircleMarkers(data = dwd
 ```
 
 
-```{r}
-
-df_dwd_PM10 <-  read_df_from_db('dwd_data_1H')
-df_dwd_PM10 <- df_dwd_PM10 %>% filter(pollutant=='PM10') %>% rename(variable=pollutant,sensor_id=station_code)
-df_dwd_PM10$datetime <- dmy_hm(df_dwd_PM10$datehour)
-df_dwd_PM10 <- df_dwd_PM10 %>% select(sensor_id,datetime,value,variable) 
-
-stations_PM10 <- unique(df_dwd_PM10$sensor_id)
-colnames(df_dwd_PM10)<- c("sensor_id" ,"datetime" , "value"  ,   "variable" )
-
-df_dwd_stations <-   read_df_from_db('stations')
-df_dwd_stations <- df_dwd_stations %>% filter(idx %in% stations_PM10)
-df_sensors_luftdaten <- read_df_from_db('sensors_luftdaten') %>% filter(sensor_type_id==14 | sensor_type_id==17)
-
-df_sensors_luftdaten<- df_sensors_luftdaten %>% mutate_at(c('location_latitude','location_longitude','location_altitude'),as.numeric)
-```
-
-
 ## combine DWD data with Luftdaten on PM10
 
 
 #
 ```{r}
 
-prepare.data <- function(dwdStationCode,location.id){
 
-df.luftdaten <- load.luftdaten.data(location.id)
-df.luftdaten$datetime <- ymd_hms(df.luftdaten$datehour)
-df.luftdaten <- df.luftdaten %>% select(sensor_id,datetime,value,variable)
-df.luftdaten$sensor_id <- as.character(df.luftdaten$sensor_id)
-
-df.dwd <- load.dwd.data(dwdStationCode)
-df.dwd<- df.dwd %>% rename(sensor_id=station_code,variable=pollutant)
-df.dwd$datetime <-  dmy_hm(df.dwd$datehour)
-
-df <- bind_rows(df.dwd,df.luftdaten) %>%  distinct(sensor_id,datetime,variable, .keep_all = TRUE)
-
-start.data <-  df %>% filter(variable=='P1') %>% pull(datetime)
-df <- df %>% filter(datetime>=min(start.data))
-
-return (df %>% select(-datehour))
-}
 
 ```
 
 ## select specific sensor
 ```{r}
 df.dwd <- load.dwd.data('DERP010')
-df <- prepare.data('DERP010',c(10621))
+df <- prepare.data('DERP010',c(244))
 spreado <- df  %>% select(-sensor_id) %>% spread(variable,value)
 ```
 

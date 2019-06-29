@@ -39,3 +39,4 @@ vignettes/*.pdf
 data/
 .ipynb_checkpoints/
 __pycache__/
+.Rproj.user
