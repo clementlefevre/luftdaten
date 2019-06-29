@@ -2,6 +2,7 @@ library(geosphere)
 
 
 
+
 compute_proximity_table<- function(luftdaten.geo,dwd.stations.geo ){
   
 
