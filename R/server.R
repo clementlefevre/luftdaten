@@ -51,6 +51,26 @@ shinyServer(function(input, output, session) {
       na.rm = TRUE
     )
     
+    if ( c('humidity','temperature') %in% colnames(spreado) ){
+      spreado$humidity.rm <-           rollmean(
+        spreado$humidity,
+        k = 24*1,
+        fill = NA,
+        na.rm = TRUE
+      )
+      
+      spreado$temperature.rm <-           rollmean(
+        spreado$temperature,
+        k = 24*1,
+        fill = NA,
+        na.rm = TRUE
+      )
+      
+    } else {
+      spreado$humidity.rm <- 0
+      spreado$temperature.rm <-0
+    }
+   
     data$spreado <- spreado
     
     
@@ -63,20 +83,32 @@ shinyServer(function(input, output, session) {
   })
   
   output$map.location.selected <- renderLeaflet({
+    print(data.plot()$sensors_info)
     location.longi <- head(data.plot()$sensors_info$location_longitude,1)
     location.lati <-head(data.plot()$sensors_info$location_latitude,1)
     print(location.longi)
     print(location.lati)
-   
-    m.detailed <- leaflet() %>% setView(lng =location.longi, lat = location.lati, zoom = 8)
+    
+    dwd_station_id <- head(data.plot()$sensors_info$dwd_station_id,1)
+    
+    dwd.station.longi <- dwd.stations %>% filter(idx==dwd_station_id) %>% pull(longitude) %>% head(1)
+    dwd.station.lati <- dwd.stations %>% filter(idx==dwd_station_id) %>% pull(latitude) %>% head(1)
+    
+    m.detailed <- leaflet() %>% setView(lng =location.longi, lat = location.lati, zoom = 15)
     m.detailed <-
       m.detailed %>% addProviderTiles(providers$Stamen.Toner)  %>%   addCircleMarkers(
-       
         lng = location.longi,
         lat = location.lati,
         radius = 6,
-        
         stroke = TRUE,
+        fillOpacity = 1,
+        color='red'
+      )  %>%   addCircleMarkers(
+        lng = dwd.station.longi,
+        lat = dwd.station.lati,
+        radius = 8,
+        stroke = TRUE,
+        color='blue',
         fillOpacity = 1
       ) 
     m.detailed
@@ -90,9 +122,17 @@ shinyServer(function(input, output, session) {
     df <- data.plot()$spreado  %>% arrange(datetime)
   
     print(head(df))
-    p <- plot_ly(df, x = ~datetime, y = ~PM10.rm, name = 'PM10', type = 'scatter', mode = 'lines',
-                 line = list(color = 'rgb(92,184,178)', width = 1)) %>%
-      add_trace(y = ~P1.rm, name = 'P1', line = list(color = 'rgb(46,92,89)', width = 1))
+    p1 <- plot_ly(df, x = ~datetime, y = ~PM10.rm, name = 'PM10', type = 'scatter', mode = 'lines',
+                 line = list(color = 'rgb(94,182,104)', width = 1)) %>%
+      add_trace(y = ~P1.rm, name = 'P1', line = list(color = 'rgb(0,66,37)', width = 1))
+    
+    p2 <- plot_ly(df, x = ~datetime, y = ~humidity.rm,type = 'scatter', mode = 'lines',name='humidity',
+                  line = list(color = 'rgb(92,184,178)', width = 1) )
+    
+    p3 <- plot_ly(df, x = ~datetime, y = ~temperature.rm,type = 'scatter', mode = 'lines',name='temperature',
+                  line = list(color = 'rgb(255,162,10)', width = 1) )
+     
+    p <- subplot(p1, p2,p3,nrows = 3, shareX = TRUE)
     p
   })
   
