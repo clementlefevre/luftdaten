@@ -14,17 +14,33 @@ library(zoo)
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output, session) {
- 
-  # text output
-  output$text <- renderText({
+  
+  observeEvent(input$map.dwd_marker_click, { 
+    p <- input$map.dwd_marker_click  # typo was on this line
     
-    #data.plot()$dwd.station$
+    if(!is.null(input$map.dwd_marker_click$id)){
+      updateSelectInput(session, "locationChoice",
+                        
+                        selected = input$map.dwd_marker_click$id)
+    }
+   
   })
   
+ 
+
   
-  data.plot <- eventReactive(input$locationChoice, {
+  
+  data.plot <- eventReactive(c(input$locationChoice,input$map.dwd_marker_click), {
     
-    luftdaten.sensors.selected <- luftdaten.sensors %>% filter(location_id == input$locationChoice) 
+    if(!is.null(input$map.dwd_marker_click$id)){
+      selected_location_id <- input$map.dwd_marker_click$id
+    
+      
+    } else{
+      selected_location_id <- input$locationChoice
+    }
+    
+    luftdaten.sensors.selected <- luftdaten.sensors %>% filter(location_id == selected_location_id) 
     
     dwd.station.id <-luftdaten.sensors.selected      %>% pull(dwd_station_id)
     sensors_id <- luftdaten.sensors.selected      %>% pull(sensor_id)
@@ -83,11 +99,10 @@ shinyServer(function(input, output, session) {
   })
   
   output$map.location.selected <- renderLeaflet({
-    print(data.plot()$sensors_info)
+  
     location.longi <- head(data.plot()$sensors_info$location_longitude,1)
     location.lati <-head(data.plot()$sensors_info$location_latitude,1)
-    print(location.longi)
-    print(location.lati)
+    
     
     dwd_station_id <- head(data.plot()$sensors_info$dwd_station_id,1)
     
@@ -121,7 +136,6 @@ shinyServer(function(input, output, session) {
   output$plot <- renderPlotly({
     df <- data.plot()$spreado  %>% arrange(datetime)
   
-    print(head(df))
     p1 <- plot_ly(df, x = ~datetime, y = ~PM10.rm, name = 'PM10', type = 'scatter', mode = 'lines',
                  line = list(color = 'rgb(94,182,104)', width = 1)) %>%
       add_trace(y = ~P1.rm, name = 'P1', line = list(color = 'rgb(0,66,37)', width = 1))

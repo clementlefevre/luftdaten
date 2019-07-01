@@ -51,6 +51,7 @@ m <-
     data = luftdaten.sensors,
     lng = ~ location_longitude_jitter,
     lat = ~ location_latitude_jitter,
+    layerId = ~location_id,
     radius = 5,
     stroke = FALSE,
     color =  ~ pal(sensor_type_id),
