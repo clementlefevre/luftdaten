@@ -12,8 +12,24 @@ library(tidyverse)
 library(plotly)
 
 
+
+
 # Define server logic required to draw a histogram
 shinyServer(function(input, output, session) {
+  
+  haehnel<- NULL
+  
+  
+ haehnel <-  eventReactive(c(input$slider1,input$locationChoice),{
+    df <-  data.plot()$spreado
+    rh<-df$humidity.rm/100 
+    beta_haehnel <- input$slider1
+    haehnel <-df$P1.rm*((1-rh)^beta_haehnel)
+    haehnel
+    
+  })
+  
+  
   observeEvent(input$map.dwd_marker_click, {
     p <- input$map.dwd_marker_click  # typo was on this line
     
@@ -26,9 +42,7 @@ shinyServer(function(input, output, session) {
     
   })
   
-  
-  
-  
+
   
   data.plot <-
     eventReactive(c(input$locationChoice, input$map.dwd_marker_click), {
@@ -54,8 +68,9 @@ shinyServer(function(input, output, session) {
       data$sensors_info <- luftdaten.sensors.selected
       data$df <- prepare.data(dwd.station.id, sensors_id)
       
-      spreado <- spread.data(data$df)
+      spreado <- spread.data(data$df)  %>% filter(!is.na(humidity.rm)) %>% filter(!is.na(P1.rm))
       
+     
       
       data$spreado <- spreado
       
@@ -109,9 +124,10 @@ shinyServer(function(input, output, session) {
   
   
   
-  output$data <- renderDataTable(data.plot()$df)
+ 
   output$plot.timeline <- renderPlotly({
     df <- data.plot()$spreado  %>% arrange(datetime)
+    df$haehnel <- haehnel()
     
     
     p1 <-
@@ -128,6 +144,11 @@ shinyServer(function(input, output, session) {
         y = ~ P1.rm,
         name = 'P1',
         line = list(color = 'rgb(0,66,37)', width = 1)
+      ) %>%
+      add_trace(
+        y = ~ haehnel,
+        name = 'P1.haehnel',
+        line = list(color = 'rgb(245, 176, 66)', width = 1)
       )
     
     p2 <-
@@ -146,6 +167,7 @@ shinyServer(function(input, output, session) {
         df,
         x = ~ datetime,
         y = ~ temperature.rm,
+        
         type = 'scatter',
         mode = 'lines',
         name = 'temperature',
@@ -156,34 +178,34 @@ shinyServer(function(input, output, session) {
     p
   })
   
-  output$plot.relationships <- renderPlotly({
-    df <- data.plot()$spreado  %>% arrange(datetime)
-    df$month.period <- month(df$datetime)
+  output$cross_correlation_plot <- renderPlot({
+    df <-data.plot()$spreado  %>% filter(!is.na(P1.rm) & !is.na(PM10.rm) & !is.na(temperature.rm) & !is.na(humidity.rm))
+    ccf(df$PM10.rm,df$P1.rm,na.rm=T)
     
-    p <-
-      plot_ly(
-        data = df,
-        x = ~ PM10 / P1,
-        y = ~ log(1 + humidity),
-        color =  ~ as.numeric(datetime),
-        alpha = .5,
-        marker = list()
-      )
-    
-    p
-  })
+  }
+  
+  )
+  
+ 
   output$plot.DWD_vs_Luftdaten <- renderPlotly({
     df <- data.plot()$spreado  %>% filter(!is.na(humidity))
+    
+    
+    model <- lm(data=df,P1.rm~PM10.rm)
+    adjusted_r2 <- summary(model)$adj.r.squared
   
     p <-
       plot_ly(
         data = df,
-        x = ~ PM10,
-        y = ~ P1,
+        x = ~ PM10.rm,
+        y = ~ P1.rm,
         color =  ~ as.numeric(humidity),
         alpha = .5,
+        type = 'scatter',
+        mode = 'markers',
         marker = list()
-      )%>%layout(xaxis = list(range = c(0, 100)),yaxis=list(range=c(0,100)))
+        
+      )%>%layout(title = paste0('beta :',input$slider1,'adjusted R2 = ',adjusted_r2),xaxis = list(range = c(0, 100)),yaxis=list(range=c(0,100)))
     
     p
   })
@@ -191,20 +213,24 @@ shinyServer(function(input, output, session) {
   output$plot.DWD_vs_Luftdaten_Haehnel <- renderPlotly({
     
     
-    df <- data.plot()$spreado  %>% filter(!is.na(humidity))
-    df$rh<- df$humidity.rm/100
-    beta_haehnel <- input$slider1
-    df$haehnel <- df$P1*((1-df$rh)^beta_haehnel)
+    df <- data.plot()$spreado 
+   
+    df$haehnel <- haehnel()
     
+    model <- lm(data=df,haehnel~PM10.rm)
+    adjusted_r2 <- summary(model)$adj.r.squared
+
     p <-
       plot_ly(
         data = df,
-        x = ~ PM10,
+        x = ~ PM10.rm,
         y = ~ haehnel,
-        color =  ~ as.numeric(humidity),
+        color =  ~ as.numeric(humidity.rm),
         alpha = .5,
+        type = 'scatter',
+        mode = 'markers',
         marker = list()
-      )%>% layout(xaxis = list(range = c(0, 100)),yaxis=list(range=c(0,100)))
+      )%>% layout( title = paste0('beta :',input$slider1,'adjusted R2 = ',adjusted_r2),xaxis = list(range = c(0, 100)),yaxis=list(range=c(0,100)))
     
     p
   })

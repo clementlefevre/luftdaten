@@ -211,3 +211,10 @@ df.rh$haehnel <- (1-df.rh$rh)^.5
 ggplot(df.rh,aes(rh,haehnel))+ geom_point()
 ```
 
+```{r}
+library(leaflet.extras)
+
+leaflet(quakes) %>% addProviderTiles(providers$Stamen.Toner) %>%
+  addWebGLHeatmap(lng=~long, lat=~lat, size = 60000)
+```
+

@@ -32,9 +32,9 @@ shinyUI(fluidPage(
     mainPanel(
       tabsetPanel(
         tabPanel("Map", leafletOutput("map.dwd")),
-        tabPanel("Timeline", plotlyOutput("plot.timeline")
+        tabPanel("Timeline", plotlyOutput("plot.timeline"), plotOutput("cross_correlation_plot")
                 ),
-        tabPanel("Relationships", plotlyOutput("plot.relationships"),
+        tabPanel("Relationships", 
                  plotlyOutput("plot.DWD_vs_Luftdaten"),
                  plotlyOutput("plot.DWD_vs_Luftdaten_Haehnel"))
       )

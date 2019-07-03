@@ -78,7 +78,7 @@ luftdaten.sensors.list <-
 
 bme280Measurements <- read_df_from_db('sensors_luftdaten_BME280_counts')
 
-luftdaten.sensors.list <- merge(luftdaten.sensors.list,bme280Measurements%>% select(-sensors_id),by='location_id')
+luftdaten.sensors.list <- merge(luftdaten.sensors.list,bme280Measurements%>% select(-sensor_id),by='location_id')
 
 luftdaten.sensors.list<- luftdaten.sensors.list  %>% filter(sensors_list=="BME280-SDS011") %>% ungroup() %>% arrange(distance.to.dwd,measurements)
 
