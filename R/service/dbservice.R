@@ -63,6 +63,17 @@ load.luftdaten.data <- function(sensors_on_location){
   return(df_luftdaten)
 }
 
+load.luftdaten.data.datetime <- function(date){
+  
+  con <- connect_to_db()
+  
+  df_luftdaten <- dbGetQuery(con, 'SELECT d.datehour,s.location_id,s.location_latitude,s.location_longitude,d.value FROM sensors_luftdaten s inner join (SELECT * FROM sensors_luftdaten_data WHERE datehour LIKE :x AND variable LIKE "P1") d on d.sensor_id=s.sensor_id', 
+                             params = list(x = paste0(date,'%')))
+  
+  dbDisconnect(con) 
+  return(df_luftdaten)
+}
+
 load.dwd.data <- function(station_code){
   con <- connect_to_db()
   dwd.data <-  dbGetQuery(con, 'SELECT * from dwd_data_1H WHERE "station_code" LIKE (:x)', 

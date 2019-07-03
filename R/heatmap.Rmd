@@ -1,0 +1,90 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(raster)
+library(tidyverse)
+source('service/dbservice.R')
+
+# df <- load.luftdaten.data.datetime('2018-01-12')
+# df$location_latitude<- as.numeric(df$location_latitude)
+# df$location_longitude<- as.numeric(df$location_longitude)
+# 
+#bbox <- c(13.285904,52.463540,13.526230,52.574264)
+# df.berlin <- df %>% filter(datehour =='2018-01-12 12:00:00') %>% filter(location_latitude>bbox[2] & location_latitude<bbox[4]) %>% filter(location_longitude>bbox[1] & location_longitude<bbox[3]) %>% filter(!is.na(value))
+# 
+#write.csv(x = df.berlin,'berlin_data_sample.csv')
+
+```
+
+
+# create SPDF
+```{r}
+df.berlin_sp <- read.csv('berlin_data_sample.csv')
+
+coordinates(df.berlin_sp) <- ~location_longitude + location_latitude
+# make sure that your object is spatial
+class(df.berlin_sp)
+```
+```{r}
+
+bbox <- bbox(df.berlin_sp)
+
+grd <- expand.grid(x = seq(from = bbox[1], to = bbox[3], by = 0.001),
+                   y = seq(from = bbox[2], to = bbox[4], by = 0.001))
+class(grd)
+
+coordinates(grd) <- ~x + y
+# turn into a spatial pixels object
+gridded(grd) <- TRUE
+class(grd)
+```
+```{r}
+plot(grd, cex = 1.5, col = "grey",
+     main = "Empty spatial grid with point location overlaid on top")
+ 
+plot(df.berlin_sp,
+    pch = 15,
+       col = "red",
+       cex = 1,
+       add = TRUE)
+```
+```{r}
+# make sure both layers have the same CRS
+crs(df.berlin_sp) <- CRS("+proj=longlat +datum=WGS84")
+crs(df.berlin_sp)
+## Error in crs(sea_level_2000_sp): object 'sea_level_2000_sp' not found
+crs(grd)
+## CRS arguments: NA
+crs(grd) <- crs(df.berlin_sp)
+```
+
+
+```{r}
+library(gstat)
+idw_pow1 <- idw(formula = value~ 1,
+           locations = df.berlin_sp,
+           newdata = grd,
+           #maxdist = 1,
+           idp = 2)
+class(idw_pow1)
+## Error in eval(expr, envir, enclos): object 'idw_pow1' not found
+# plot the data
+plot(idw_pow1,
+     main = "IDW raster: Power = 1",
+     col = terrain.colors(55))
+```
+```{r}
+# convert spatial pixels df to raster
+idw_pow1_ras <- raster(idw_pow1)
+# export to geotif
+writeRaster(idw_pow1_ras,
+            filename = "idw_pow1.tif", "GTiff")
+```
+
