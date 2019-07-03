@@ -3,117 +3,211 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
 
 ```{r}
 library(tidyverse)
 library(plotly)
 library(leaflet)
-source('service/db_service.R')
-
 library(lubridate)
+source('global.R')
+source('service/dbservice.R')
+require(gridExtra)
+library(gganimate)
+library(TSA)
+library(viridis)
+library(dplR)
 ```
 
 
 #load data
 
+
 ```{r}
-# 1- we need a list of DWD stations with coordinates for PM10:
-dwd.stations<- load.dwd.stations.geo('PM10')
-
-# 2 we need the list of sensors with the nearest dwd station infos:
-luftdaten.sensors<- read_df_from_db('sensors_luftdaten') %>% filter(sensor_type_id==14 | sensor_type_id==17)
-
-# 3 load proximity table and add to luftdaten_sensors
-proximity <- read_df_from_db('luftdaten_dwd_nearest_station')
-
-luftdaten.sensors <- merge(luftdaten.sensors,proximity,by='location_id',all.x=T)
-luftdaten.sensors <- luftdaten.sensors%>% mutate_at(c('location_longitude','location_latitude','location_altitude'),as.numeric)
-
-luftdaten.sensors$location_latitude_jitter <- jitter(luftdaten.sensors$location_latitude,factor= 0.01)
-luftdaten.sensors$location_longitude_jitter <- jitter(luftdaten.sensors$location_longitude,factor= 0.01)
+location_id <- 7241
+dwd_nearest_id <- luftdaten.sensors[luftdaten.sensors$location_id==location_id,]$dwd_station_id %>% unique()
+sensors_id <- luftdaten.sensors[luftdaten.sensors$location_id==location_id,]$sensor_id %>% unique()
+df <- prepare.data("DEBW122",sensors_id)
+spreado <- spread.data(df)
 ```
 
 
-# map
+
 ```{r}
+data.plot <- spreado #%>% filter(humidity<70 & P1<100)
 
-pal <- colorFactor(
-  palette = "Spectral",
-  domain = luftdaten.sensors$sensor_type_id)
-
-m <- leaflet() %>% setView(lng = 13.3493, lat = 52.5430, zoom = 7)
-m %>% addProviderTiles(providers$Stamen.Toner) %>%   addCircleMarkers(data = dwd.stations,lng = ~longitude,lat = ~latitude,radius=6,label = ~paste(idx,name,sep = ' - '),stroke = TRUE, fillOpacity = 1) %>%   addCircleMarkers(data = luftdaten.sensors,lng = ~location_longitude_jitter,lat = ~location_latitude_jitter,radius=5,stroke = FALSE, color=~pal(sensor_type_id),fillOpacity = 1,label = ~paste0('location_id: ',as.character(location_id)))
 ```
-
-
-## combine DWD data with Luftdaten on PM10
 
 
 #
 ```{r}
+data.plot$ratio.P <- data.plot$PM10.rm /data.plot$P1.rm
+data.plot$date <- as.Date(data.plot$datetime)
+
+p1<-ggplot(data=data.plot %>% filter(ratio.P<5),aes(datetime,ratio.P,color='blue'))+geom_line(color='red')
+p2 <- ggplot(data=data.plot,aes(datetime,humidity.rm,color='red'))+ geom_line(color='blue')
+grid.arrange(p1, p2, nrow=2)
+
+cor(x=data.plot$humidity.rm,y=data.plot$ratio.P, use="complete.obs")
+
+ggplot(data.plot %>% filter((date>=as.Date('2018-11-27')) & (date<=as.Date('2018-12-27'))),aes(humidity.rm,ratio.P, color=as.factor(date)))+ geom_point(size=1)#+ 
+  labs(title = 'Date: {frame_time}', x = 'humidity %', y = 'PM10/P1')+ transition_time(date) +
+  ease_aes('linear')
+```
 
 
+
+## plot PM10 vs P1
+```{r}
+spreado$rh<- spreado$humidity.rm/100
+spreado$haehnel <- spreado$P1.rm*((1-spreado$rh)^.8)
+p1<-ggplot(spreado,aes(PM10.rm,P1.rm))+ geom_point(size=.5,alpha=.5)+ylim(0,70)+xlim(0,70)+geom_smooth()
+p2<- ggplot(spreado ,aes(PM10.rm,haehnel))+ geom_point(size=.5,alpha=.5)+ylim(0,70)+xlim(0,70)+geom_smooth()
+
+grid.arrange(p1, p2, nrow=2)
 
 ```
 
-## select specific sensor
+Time Serie Analysis
+source : https://rstudio-pubs-static.s3.amazonaws.com/9428_1197bd003ebd43c49b429f22ea4f36e5.html
+# cross correlation
 ```{r}
-df.dwd <- load.dwd.data('DERP010')
-df <- prepare.data('DERP010',c(244))
-spreado <- df  %>% select(-sensor_id) %>% spread(variable,value)
+data.df <- spreado %>% filter(!is.na(P1.rm) & !is.na(PM10.rm) & !is.na(temperature.rm) & !is.na(humidity.rm))
+ccf(data.df$PM10.rm,data.df$P1.rm,na.rm=T)
+```
+# Autocorrelation
+```{r}
+acf.pm10 <- TSA::acf(data.df$PM10.rm, lag.max = 24*365, plot = FALSE)
+acf.p1 <- acf(data.df$P1.rm, lag.max = 24*365, plot = FALSE)
+
+df.acf.pm10 =  data.frame(acf=acf.pm10$acf,lag=acf.pm10$lag)
+df.acf.p1 =  data.frame(acf=acf.p1$acf,lag=acf.p1$lag)
+
+plot1 <- ggplot(df.acf.pm10) + geom_line(aes(lag/24, y = acf))+ylab("PM10 DWD")
+plot2 <- ggplot(df.acf.p1) + geom_line(aes(lag/24, y = acf))+ylab("P1")
+grid.arrange(plot1, plot2)
+
 ```
 
 
 ```{r}
-p<-ggplot(df,aes(datetime,value,color=variable))+ geom_line(size=.2)+ theme_minimal()
-ggplotly(p)
+
+# compute the Fourier Transform
+p = periodogram(data.df$P1.rm)
+
+dd = data.frame(freq=p$freq, spec=p$spec)
+
+ggplot(dd,aes(freq,spec))+ geom_point()+geom_linerange(aes(x=freq, ymax=spec, ymin=0.75))#+xlim(0,0.005)
+order = dd[order(-dd$spec),]
+top2 = head(order, 4)
+
+ ggplot(dd,aes(freq,spec))+ geom_point()+geom_linerange(aes(x=freq, ymax=spec, ymin=0.75)) + scale_x_log10()
+ 
+# display the 2 highest "power" frequencies
+print(top2)
+
+time = 1/top2$f
+time/24
+```
+# kernel smoothing
+```{r}
+k <- kernel("daniell", c(9, 9, 9))
+plot(k)
+
+smooth.spec <- spec.pgram(data.df$PM10.rm, kernel = k, taper = 0.05)
+
+df.smooth.spec <- data.frame(freq=smooth.spec$freq,spec=smooth.spec$spec,period= smooth.spec$freq^-1/24)
+
+period.labels <- c(1,8,12,24,48,72,24*5,24*7,24*30,24*365)/24
+
+ggplot(df.smooth.spec,aes(freq,spec))+ geom_line()+ scale_y_log10()+scale_x_continuous("Period (days)",breaks = 1/period.labels,labels=period.labels)
+```
+# wavelet
+```{r}
+data.df <- data.df %>% mutate(id = row_number())
+wave.out <- morlet(y1 = data.df$PM10.rm, x1 = data.df$id/24, p2 = 8, dj = 0.1, siglvl = 0.95)
+# p2=6 <=> estimate out to 2^8 = 256 months dj <=> controls the frequency
+# resolution hack the period estimate to be in years, not months
+wave.out$period <- wave.out$period/24
+levs <- quantile(wave.out$Power, c(0, 0.25, 0.5, 0.75, 0.95, 1))
+wavelet.plot(wave.out, wavelet.levels = levs, crn.ylim = c(-100, 100))
 ```
 
-```{r}
-library(viridis)
-p<-ggplot(spreado,aes(humidity,log(PM10/P1+1),color=temperature,alpha=.5))+geom_point()+scale_color_viridis("Temp C")
-ggplotly(p)
-```
 
+## plot delta dwd vs luftdaten
 ```{r}
-p<-ggplot(spreado %>% filter(humidity>70),aes(P1,PM10,color=humidity,alpha=.5))+geom_point()+scale_color_viridis("Humidity %")+ geom_abline(intercept = 0, slope = 1)+ geom_smooth()+ geom_abline()
-ggplotly(p)
+
+ggplot(spreado,aes(datetime,PM10.rm/P1.rm))+ geom_line(aes(colour=-humidity.rm),size=.2) +scale_color_viridis() 
 ```
 
 #
 ```{r}
 library(randomForest)
-data.df <- spreado %>% filter(!is.na(P1) & !is.na(PM10)) #%>% filter(humidity>70)
-fit <- lm(data=data.df,P1~humidity+temperature+PM10)
+
+
+
+## 75% of the sample size
+smp_size <- floor(0.75 * nrow(data.df))
+
+## set the seed to make your partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(data.df)), size = smp_size)
+
+train <- data.df[train_ind, ]
+test <- data.df[-train_ind, ]
+
+train <- data.df[1:smp_size, ]
+test <- data.df[smp_size:nrow(data.df), ]
+
+
+train <- data.df[data.df$humidity.rm<60, ]
+test <- data.df[data.df$humidity.rm>=60, ]
+
+
+fit <- lm(data=train,P1.rm~temperature.rm+PM10.rm+log(humidity.rm))
+
 print(summary(fit))
 
-data.df$predicted.lm <- predict(fit)
-ggplot(data.df,aes(P1,predicted.lm,color=humidity))+ geom_point()+geom_abline(intercept = 0)
-```
-```{r}
-model.rf <- randomForest(P1~humidity+temperature+PM10, data = data.df, ntree = 500, na.action = na.omit)
+test$predicted.lm <- predict(fit,test)
 
-data.df$predicted.rf <- predict(model.rf)
-ggplot(data.df,aes(predicted.lm,predicted.rf,color=humidity))+ geom_point()+ geom_abline(intercept = 0)
+train.and.test <- bind_rows(train %>% select(datetime,P1.rm) %>% mutate(serie='train'),test %>% select(datetime,P1.rm=predicted.lm)%>% mutate(serie='test'))
+
+train.and.test <- bind_rows(train.and.test,data.df %>% select(datetime,P1.rm) %>% mutate(serie='original')) 
+
+train.and.test <- train.and.test%>% arrange(datetime)
+
+train.and.test<- train.and.test %>% mutate(color.code =ifelse(serie=='train',0,1))
+p<-ggplot(train.and.test,aes(datetime,P1.rm))+ geom_line(aes(colour=color.code))
+p
+ggplotly(p)
+```
+
+```{r}
+
+model.rf <- randomForest(P1.rm~humidity.rm+temperature.rm+PM10.rm, data = train, ntree = 500, na.action = na.omit)
+
+test$predicted.rf <- predict(model.rf,test)
+ggplot(test,aes(P1.rm,predicted.rf,color=humidity))+ geom_point()+ geom_abline(intercept = 0)
 ```
 
 ## Hähnel
 
 ```{r}
-rh <- data.df$humidity/100
-data.df$haehnel <- data.df$P1*((1-rh)^.01)
+rh <- data.df$humidity.rm/100
+data.df$haehnel <- data.df$P1.rm*((1-rh)^.2)
 
-ggplot(data.df,aes(PM10,haehnel))+ geom_point()+ geom_abline(intercept = 0)
+gato <- data.df %>% select(datetime,PM10.rm,P1.rm,haehnel)%>% gather(key,value,-datetime)
+
+
+p<-ggplot(gato,aes(datetime,value,color=key))+ geom_line()
+ggplotly(p)
+
 ```
 
 ```{r}
 ggplot(data.df,aes(haehnel,PM10,color=humidity))+ geom_point()+ geom_abline(intercept = 0)
 humidity.x <-seq(0,1,1/100)
 df.rh <- data.frame(rh=humidity.x)
-df.rh$haehnel <- (1-df.rh$rh)^.6
+df.rh$haehnel <- (1-df.rh$rh)^.5
 ggplot(df.rh,aes(rh,haehnel))+ geom_point()
 ```
 

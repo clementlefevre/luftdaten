@@ -113,11 +113,18 @@ load.luftdaten.sensors <- function(){
   
   luftdaten.sensors <- luftdaten.sensors %>% arrange(distance.to.dwd)
   
-  
-  
   dbDisconnect(con)
   return (luftdaten.sensors)
 }
+
+createBME280MeasurementsTable <- function(){
+  con <- connect_to_db()
+  SQL <- 'select s.location_id,s.sensor_id,count(*) as measurements from sensors_luftdaten_data d left join sensors_luftdaten s on d.sensor_id=s.sensor_id where s.sensor_type_name LIKE "BME280" group by s.location_id order by measurements DESC'
+  BME280_counts <- dbGetQuery(con,SQL)
+  dbWriteTable(con, 'sensors_luftdaten_BME280_counts', BME280_counts,overwrite=TRUE)
+  dbDisconnect(con)
+  
+  }
 
 drop.table<- function(tableName){
   con <- connect_to_db()

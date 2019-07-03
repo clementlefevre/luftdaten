@@ -1,6 +1,7 @@
 library(tidyr)
 library(leaflet)
 library(plotly)
+library(zoo)
 
 
 source('service/geoservice.R')
@@ -21,6 +22,49 @@ luftdaten.sensors <-
     by.y = 'idx'
   )
 
+spread.data <- function(df){
+  
+  spreado <- df  %>% dplyr::select(-sensor_id) %>% spread(variable,value)
+  
+  spreado$PM10.rm <-           rollmean(
+    spreado$PM10,
+    k = 24*1,
+    fill = NA,
+    na.rm = TRUE
+  )
+  
+  
+  
+  spreado$P1.rm <-           rollmean(
+    spreado$P1,
+    k = 24*1,
+    fill = NA,
+    na.rm = TRUE
+  )
+  
+  if ( c('humidity','temperature') %in% colnames(spreado) ){
+    spreado$humidity.rm <-           rollmean(
+      spreado$humidity,
+      k = 24*1,
+      fill = NA,
+      na.rm = TRUE
+    )
+    
+    spreado$temperature.rm <-           rollmean(
+      spreado$temperature,
+      k = 24*1,
+      fill = NA,
+      na.rm = TRUE
+    )
+    
+  } else {
+    spreado$humidity.rm <- 0
+    spreado$temperature.rm <-0
+  }
+  
+  return (spreado)
+}
+
 
 luftdaten.sensors.list <-
   as.tibble(luftdaten.sensors) %>% select(location_id, sensor_type_name, distance.to.dwd, name, region) %>% arrange(sensor_type_name) %>%
@@ -32,7 +76,11 @@ luftdaten.sensors.list <-
     distance.to.dwd = first(distance.to.dwd)
   )  %>% distinct()
 
-luftdaten.sensors.list<- luftdaten.sensors.list %>% mutate(label=paste(sensors_list,distance_km,dwd_station,dwd_region,sep='-') )%>% arrange(distance.to.dwd)
+bme280Measurements <- read_df_from_db('sensors_luftdaten_BME280_counts')
+
+luftdaten.sensors.list <- merge(luftdaten.sensors.list,bme280Measurements%>% select(-sensors_id),by='location_id')
+
+luftdaten.sensors.list<- luftdaten.sensors.list  %>% filter(sensors_list=="BME280-SDS011") %>% ungroup() %>% arrange(distance.to.dwd,measurements)
 
 pal <- colorFactor(palette = "Spectral",
                    domain = luftdaten.sensors$sensor_type_id)

@@ -45,7 +45,7 @@ updateNearestDwdStation <- function(){
 prepare.data <- function(dwdStationCode,sensors_id){
  
   df.luftdaten <- load.luftdaten.data(sensors_id)
-  
+ 
   df.luftdaten$datetime <- ymd_hms(df.luftdaten$datehour)
   df.luftdaten <- df.luftdaten %>% select(sensor_id,datetime,value,variable)
   df.luftdaten$sensor_id <- as.character(df.luftdaten$sensor_id)
@@ -55,7 +55,7 @@ prepare.data <- function(dwdStationCode,sensors_id){
   df.dwd$datetime <-  dmy_hm(df.dwd$datehour)
   
   df <- bind_rows(df.dwd,df.luftdaten) %>%  distinct(sensor_id,datetime,variable, .keep_all = TRUE)
-  
+
   start.data <-  df %>% filter(variable=='P1') %>% pull(datetime)
   df <- df %>% filter(datetime>=min(start.data))
   
