@@ -1,0 +1,9 @@
+TODO
+- change dwd color to orange
+- adjust map to show dwd and luftdaten
+- plot on big map all sensors
+- remove NA on scatter plot
+- show periodogram for both dwd and luftdaten
+- add comment page with some overall charts and history.
+- add other Models from Norbert.
+- make  YoY plot.

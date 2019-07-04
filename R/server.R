@@ -186,7 +186,7 @@ shinyServer(function(input, output, session) {
         line = list(color = 'rgb(255,162,10)', width = 1)
       )
     
-    p <- subplot(p1, p2, nrows = 2, shareX = TRUE)
+    p <- subplot(p1, p2, nrows = 2, shareX = TRUE,heights = c(0.7, 0.3))
     p
   })
   
