@@ -22,44 +22,39 @@ luftdaten.sensors <-
     by.y = 'idx'
   )
 
-spread.data <- function(df){
+spread.data <- function(df) {
+  spreado <-
+    df  %>% dplyr::select(-sensor_id) %>% spread(variable, value)
   
-  spreado <- df  %>% dplyr::select(-sensor_id) %>% spread(variable,value)
-  
-  spreado$PM10.rm <-           rollmean(
-    spreado$PM10,
-    k = 24*1,
-    fill = NA,
-    na.rm = TRUE
-  )
+  spreado$PM10.rm <-           rollmean(spreado$PM10,
+                                        k = 24 * 1,
+                                        fill = NA,
+                                        na.rm = TRUE)
   
   
   
-  spreado$P1.rm <-           rollmean(
-    spreado$P1,
-    k = 24*1,
-    fill = NA,
-    na.rm = TRUE
-  )
+  spreado$P1.rm <-           rollmean(spreado$P1,
+                                      k = 24 * 1,
+                                      fill = NA,
+                                      na.rm = TRUE)
   
-  if ( c('humidity','temperature') %in% colnames(spreado) ){
-    spreado$humidity.rm <-           rollmean(
-      spreado$humidity,
-      k = 24*1,
-      fill = NA,
-      na.rm = TRUE
-    )
+  if ('humidity' %in% colnames(spreado) &
+      'temperature' %in% colnames(spreado)) {
+    spreado$humidity.rm <-           rollmean(spreado$humidity,
+                                              k = 24 * 1,
+                                              fill = NA,
+                                              na.rm = TRUE)
     
     spreado$temperature.rm <-           rollmean(
       spreado$temperature,
-      k = 24*1,
+      k = 24 * 1,
       fill = NA,
       na.rm = TRUE
     )
     
   } else {
     spreado$humidity.rm <- 0
-    spreado$temperature.rm <-0
+    spreado$temperature.rm <- 0
   }
   
   return (spreado)
@@ -76,11 +71,16 @@ luftdaten.sensors.list <-
     distance.to.dwd = first(distance.to.dwd)
   )  %>% distinct()
 
-bme280Measurements <- read_df_from_db('sensors_luftdaten_BME280_counts')
+bme280Measurements <-
+  read_df_from_db('sensors_luftdaten_BME280_counts')
 
-luftdaten.sensors.list <- merge(luftdaten.sensors.list,bme280Measurements%>% select(-sensor_id),by='location_id')
+luftdaten.sensors.list <-
+  merge(luftdaten.sensors.list,
+        bme280Measurements %>% select(-sensor_id),
+        by = 'location_id')
 
-luftdaten.sensors.list<- luftdaten.sensors.list  %>% filter(sensors_list=="BME280-SDS011") %>% ungroup() %>% arrange(distance.to.dwd,measurements)
+luftdaten.sensors.list <-
+  luftdaten.sensors.list  %>% filter(sensors_list == "BME280-SDS011") %>% ungroup() %>% arrange(distance.to.dwd, measurements)
 
 pal <- colorFactor(palette = "Spectral",
                    domain = luftdaten.sensors$sensor_type_id)
@@ -99,12 +99,10 @@ m <-
     data = luftdaten.sensors,
     lng = ~ location_longitude_jitter,
     lat = ~ location_latitude_jitter,
-    layerId = ~location_id,
+    layerId = ~ location_id,
     radius = 5,
     stroke = FALSE,
     color =  ~ pal(sensor_type_id),
     fillOpacity = 1,
     label = ~ paste0('location_id: ', as.character(location_id))
   )
-
-

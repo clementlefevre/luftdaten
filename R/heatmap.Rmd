@@ -10,9 +10,14 @@ Try executing this chunk by clicking the *Run* button within the chunk or by pla
 ```{r}
 library(raster)
 library(tidyverse)
+library(gstat)
+library(leaflet)
+library(RColorBrewer)
 source('service/dbservice.R')
 
-# df <- load.luftdaten.data.datetime('2018-01-12')
+df <- load.luftdaten.data.datetime('2018-01-12')
+
+
 # df$location_latitude<- as.numeric(df$location_latitude)
 # df$location_longitude<- as.numeric(df$location_longitude)
 # 
@@ -67,14 +72,14 @@ crs(grd) <- crs(df.berlin_sp)
 
 
 ```{r}
-library(gstat)
+
 idw_pow1 <- idw(formula = value~ 1,
            locations = df.berlin_sp,
            newdata = grd,
-           #maxdist = 1,
-           idp = 2)
+           maxdist = 1,
+           idp = 3)
 class(idw_pow1)
-## Error in eval(expr, envir, enclos): object 'idw_pow1' not found
+
 # plot the data
 plot(idw_pow1,
      main = "IDW raster: Power = 1",
@@ -85,6 +90,17 @@ plot(idw_pow1,
 idw_pow1_ras <- raster(idw_pow1)
 # export to geotif
 writeRaster(idw_pow1_ras,
-            filename = "idw_pow1.tif", "GTiff")
+            filename = "idw_pow1.tif", "GTiff",overwrite=T)
+```
+
+```{r}
+r <- raster("idw_pow1.tif")
+pal <- colorNumeric(c("#FFFFCC","#41B6C4", "#0C2C84"), values(r),
+  na.color = "transparent")
+
+leaflet() %>% addProviderTiles(providers$Stamen.Toner)%>%
+  addRasterImage(r, colors = pal, opacity = 0.7) %>%
+  addLegend(pal = pal, values = values(r),
+    title = "Surface temp")
 ```
 

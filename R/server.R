@@ -10,24 +10,28 @@
 library(shiny)
 library(tidyverse)
 library(plotly)
+library(viridis)
+library(gridExtra)
 
 
 
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output, session) {
+  haehnel <- NULL
   
-  haehnel<- NULL
-  
-  
- haehnel <-  eventReactive(c(input$slider1,input$locationChoice),{
-    df <-  data.plot()$spreado
-    rh<-df$humidity.rm/100 
-    beta_haehnel <- input$slider1
-    haehnel <-df$P1.rm*((1-rh)^beta_haehnel)
-    haehnel
+  haehnel <-
+    eventReactive(c(input$slider.haehnel.beta, input$locationChoice), {
+     
+      df <-  data.plot()$spreado %>% filter(!is.na(humidity.rm))
+     
+      rh <- df$humidity.rm / 100
+      beta_haehnel <- input$slider.haehnel.beta
+      haehnel <- df$P1.rm * ((1 - rh) ^ beta_haehnel)
+      haehnel
     
-  })
+      
+    })
   
   
   observeEvent(input$map.dwd_marker_click, {
@@ -42,17 +46,14 @@ shinyServer(function(input, output, session) {
     
   })
   
-
+  
   
   data.plot <-
-    eventReactive(c(input$locationChoice, input$map.dwd_marker_click), {
-      if (!is.null(input$map.dwd_marker_click$id)) {
-        selected_location_id <- input$map.dwd_marker_click$id
-        
-        
-      } else{
-        selected_location_id <- input$locationChoice
-      }
+    eventReactive(c(input$locationChoice,input$slider.lag), {
+      # add input$map.dwd_marker_click if selection from map
+      req(input$locationChoice)
+      selected_location_id <- isolate(input$locationChoice)
+      
       
       luftdaten.sensors.selected <-
         luftdaten.sensors %>% filter(location_id == selected_location_id)
@@ -68,11 +69,19 @@ shinyServer(function(input, output, session) {
       data$sensors_info <- luftdaten.sensors.selected
       data$df <- prepare.data(dwd.station.id, sensors_id)
       
-      spreado <- spread.data(data$df)  %>% filter(!is.na(humidity.rm)) %>% filter(!is.na(P1.rm))
+      spreado <-
+        spread.data(data$df)  %>% filter(!is.na(humidity.rm)) %>% filter(!is.na(P1.rm))
       
+      if(input$slider.lag>=0){
+        spreado <- spreado %>% mutate(PM10.rm=lag(PM10.rm,input$slider.lag))
+      } else{
+        spreado <- spreado %>% mutate(PM10.rm=lead(PM10.rm,input$slider.lag*-1))
+      }
+    
      
-      
       data$spreado <- spreado
+      
+      
       
       
       data
@@ -84,10 +93,11 @@ shinyServer(function(input, output, session) {
   })
   
   output$map.location.selected <- renderLeaflet({
+    data <- data.plot()
     location.longi <-
-      head(data.plot()$sensors_info$location_longitude, 1)
+      head(data$sensors_info$location_longitude, 1)
     location.lati <-
-      head(data.plot()$sensors_info$location_latitude, 1)
+      head(data$sensors_info$location_latitude, 1)
     
     
     dwd_station_id <-
@@ -124,9 +134,11 @@ shinyServer(function(input, output, session) {
   
   
   
- 
+  
   output$plot.timeline <- renderPlotly({
+   
     df <- data.plot()$spreado  %>% arrange(datetime)
+   
     df$haehnel <- haehnel()
     
     
@@ -179,60 +191,46 @@ shinyServer(function(input, output, session) {
   })
   
   output$cross_correlation_plot <- renderPlot({
-    df <-data.plot()$spreado  %>% filter(!is.na(P1.rm) & !is.na(PM10.rm) & !is.na(temperature.rm) & !is.na(humidity.rm))
-    ccf(df$PM10.rm,df$P1.rm,na.rm=T)
+    df <-
+      data.plot()$spreado  %>% filter(!is.na(P1.rm) &
+                                        !is.na(PM10.rm) & !is.na(temperature.rm) & !is.na(humidity.rm))
+    ccf(df$PM10.rm, df$P1.rm)
     
-  }
-  
-  )
-  
- 
-  output$plot.DWD_vs_Luftdaten <- renderPlotly({
-    df <- data.plot()$spreado  %>% filter(!is.na(humidity))
-    
-    
-    model <- lm(data=df,P1.rm~PM10.rm)
-    adjusted_r2 <- summary(model)$adj.r.squared
-  
-    p <-
-      plot_ly(
-        data = df,
-        x = ~ PM10.rm,
-        y = ~ P1.rm,
-        color =  ~ as.numeric(humidity),
-        alpha = .5,
-        type = 'scatter',
-        mode = 'markers',
-        marker = list()
-        
-      )%>%layout(title = paste0('beta :',input$slider1,'adjusted R2 = ',adjusted_r2),xaxis = list(range = c(0, 100)),yaxis=list(range=c(0,100)))
-    
-    p
   })
   
-  output$plot.DWD_vs_Luftdaten_Haehnel <- renderPlotly({
-    
-    
-    df <- data.plot()$spreado 
-   
+  
+  output$plot.DWD_vs_Luftdaten <- renderPlot({
+    df <- data.plot()$spreado  %>% filter(!is.na(humidity.rm))
     df$haehnel <- haehnel()
     
-    model <- lm(data=df,haehnel~PM10.rm)
-    adjusted_r2 <- summary(model)$adj.r.squared
-
-    p <-
-      plot_ly(
-        data = df,
-        x = ~ PM10.rm,
-        y = ~ haehnel,
-        color =  ~ as.numeric(humidity.rm),
-        alpha = .5,
-        type = 'scatter',
-        mode = 'markers',
-        marker = list()
-      )%>% layout( title = paste0('beta :',input$slider1,'adjusted R2 = ',adjusted_r2),xaxis = list(range = c(0, 100)),yaxis=list(range=c(0,100)))
+    model.1 <- lm(data = df, P1.rm ~ PM10.rm)
+    rmse.1 <- sqrt(mean(model.1$residuals^2))
+    adjusted_r2.1 <-  paste0('Adj.R2 : ',round(summary(model.1)$adj.r.squared,2) ,'- rmse: ',rmse.1)
     
-    p
+    
+    model.2 <- lm(data = df, haehnel ~ PM10.rm)
+    rmse.2 <-sqrt(mean(model.2$residuals^2))
+    adjusted_r2.2 <- paste0('Adj.R2 : ',round(summary(model.2)$adj.r.squared,2), '- rmse: ',rmse.2)
+    
+  
+    gato <- df %>% select(datetime,PM10.rm,P1.rm,humidity.rm,haehnel)
+    gato <- gato %>% gather(key,value,-datetime,-PM10.rm,-humidity.rm)
+    
+    dat_text <- data.frame(
+      label = c(adjusted_r2.1, adjusted_r2.2),
+      key   = c('P1.rm', 'haehnel')
+    )
+
+
+   p<- ggplot(gato,aes(PM10.rm,value))+ geom_point(aes(color=humidity.rm))+scale_color_viridis(direction=-1)+xlim(0,100)+ylim(0,100)
+  
+   p + geom_text(
+     data    = dat_text,
+     mapping = aes(x = 20, y = 90, label = label),
+     hjust   = -0.1,
+     vjust   = -1
+   ) + facet_grid(.~key)
   })
+
   
 })

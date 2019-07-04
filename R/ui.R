@@ -25,8 +25,10 @@ shinyUI(fluidPage(
       selected = ""
     ),
     leafletOutput("map.location.selected"),
-    sliderInput("slider1", label = h3("Slider"),step=.05, min = 0, 
-                max = 3, value = .5)),
+    sliderInput("slider.haehnel.beta", label = "beta for haehnel",step=.05, min = 0, 
+                max = 3, value = .5),
+    sliderInput("slider.lag", label = "Lag DWD / Luftdaten",step=1, min = -5, 
+                max = 5, value = 0)),
     
     # Show a plot of the generated distribution
     mainPanel(
@@ -35,8 +37,7 @@ shinyUI(fluidPage(
         tabPanel("Timeline", plotlyOutput("plot.timeline"), plotOutput("cross_correlation_plot")
                 ),
         tabPanel("Relationships", 
-                 plotlyOutput("plot.DWD_vs_Luftdaten"),
-                 plotlyOutput("plot.DWD_vs_Luftdaten_Haehnel"))
+                 plotOutput("plot.DWD_vs_Luftdaten"))
       )
     )
   )
