@@ -1,0 +1,52 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(plotly)
+source('service/dbservice.R')
+```
+```{r}
+df.history <- load.luftdaten.record.history.per.sensor()
+df.history$date <- as_datetime(df.history$timestamp_gmt/1000)
+
+df.history <- df.history %>% filter(date!=as.Date('2018-03-30'))
+
+df.history.ratio <- df.history %>% spread(sensor_type_name,records,fill = 0) %>% mutate(ratio_bme280 = bme280/sds011*100, ratio_dht22 = dht22/sds011*100) %>%select(date,ratio_bme280,ratio_dht22) %>% gather(key,value,-date)
+
+ggplot(df.history.ratio %>% filter(date>=as.Date('2017-01-01')),aes(date,value,fill=key))+ geom_line()
+
+```
+
+#plot per sensor
+
+```{r}
+
+p <-ggplot(df.history,aes(date,records))+ geom_line(aes(colour=sensor_type_name))
+ggplotly(p)
+```
+# plot per country
+```{r}
+df.history.country <- load.luftdaten.record.history.per.sensor.country()
+df.history.country$date <- as_datetime(df.history.country$timestamp_gmt/1000)
+
+df.history.country <- df.history.country %>% filter(date!=as.Date('2018-03-30')) %>% filter(!is.na(location_country))
+df.history.country$day.of.month <- day(df.history.country$date)
+
+p <-ggplot(df.history.country %>% filter(sensor_type_name %in% c('sds011') & day.of.month==1 & location_country %in% c('DE','BG','FR')),aes(date,records,fill=location_country))+ geom_bar(stat="identity",position = 'dodge')
+p
+```
+# plot country split
+```{r}
+groupy <- df.history.country %>% filter(date==as.Date('2019-06-01') & sensor_type_name=='bme280') %>% top_n(10,records)
+
+ggplot(groupy,aes(reorder(location_country,-records),records, fill=location_country))+geom_bar(stat="identity")
+```
+

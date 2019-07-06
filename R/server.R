@@ -111,7 +111,7 @@ shinyServer(function(input, output, session) {
     m.detailed <-
       leaflet() %>% setView(lng = location.longi,
                             lat = location.lati,
-                            zoom = 15)
+                            zoom = 12)
     m.detailed <-
       m.detailed %>% addProviderTiles(providers$Stamen.Toner)  %>%   addCircleMarkers(
         lng = location.longi,
@@ -131,15 +131,23 @@ shinyServer(function(input, output, session) {
     m.detailed
   })
   
-  
-  
-  
-  
   output$plot.timeline <- renderPlotly({
    
     df <- data.plot()$spreado  %>% arrange(datetime)
    
     df$haehnel <- haehnel()
+    aqi.good.rgba <- 'rgba(166,221,171,0.4)'
+    aqi.soso.rgba <- 'rgba(254,255,160,0.4)'
+    aqi.bad.rgba <- 'rgba(227,111,72,0.4)'
+    
+    df$aqi.good <- 13
+    
+    df$aqi.bad <- 200
+    
+ 
+    df$aqi.soso <- 50
+    
+    
     
     
     p1 <-
@@ -161,7 +169,14 @@ shinyServer(function(input, output, session) {
         y = ~ haehnel,
         name = 'P1.haehnel',
         line = list(color = 'rgb(245, 176, 66)', width = 1)
-      )
+      )  %>% 
+      add_trace( y = ~aqi.good, name = 'AQI Good', fill = 'tozeroy',
+                   fillcolor = aqi.good.rgba,
+                 line = list(color = aqi.good.rgba, width = 0)) %>%
+      add_trace(y = ~aqi.soso, type = 'scatter', mode = 'lines',fill = 'tonexty', fillcolor=aqi.soso.rgba, line = list(color =aqi.soso.rgba),
+                                                                           showlegend = FALSE, name = 'AQI SOSO') %>%
+      add_trace(y = ~aqi.bad, type = 'scatter', mode = 'lines',fill = 'tonexty', fillcolor=aqi.bad.rgba, line = list(color =aqi.bad.rgba),
+                showlegend = FALSE, name = 'AQI SOSO')
     
     p2 <-
       plot_ly(
