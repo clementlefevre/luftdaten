@@ -12,7 +12,7 @@ source('service/dbservice.R')
 dwd.stations <- load.dwd.stations.geo('PM10')
 
 # 2 we need the list of sensors with the nearest dwd station infos:
-luftdaten.sensors <- load.luftdaten.sensors()
+luftdaten.sensors <- load.luftdaten.sensors.with.data.and.dwd.station()
 
 luftdaten.sensors <-
   merge(

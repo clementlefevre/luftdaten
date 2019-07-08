@@ -65,6 +65,8 @@ load.luftdaten.data <- function(sensors_on_location) {
   return(df_luftdaten)
 }
 
+
+
 load.luftdaten.data.datetime <- function(date) {
   con <- connect_to_db()
   
@@ -115,6 +117,7 @@ load.dwd.stations.geo <- function(pollutant) {
 }
 
 load.luftdaten.geo <- function() {
+  con <- connect_to_db()
   luftdaten.locations <-
     dbGetQuery(
       con,
@@ -126,14 +129,31 @@ load.luftdaten.geo <- function() {
   return(luftdaten.locations)
 }
 
-load.luftdaten.sensors <- function() {
+load.luftdaten.sensors <- function(){
+  con <- connect_to_db()
+  SQL <- "SELECT * FROM sensors_luftdaten"
+  df <- dbGetQuery(
+    con,SQL)
+  dbDisconnect(con)
+  return(df)
+  
+  
+}
+load.luftdaten.sensors.with.data <- function(){
   con <- connect_to_db()
   luftdaten.sensors <-
     dbGetQuery(
       con,
       'SELECT DISTINCT * from sensors_luftdaten s WHERE s.sensor_id  IN (SELECT DISTINCT sensor_id FROM sensors_luftdaten_data)'
     )
-  luftdaten.sensors <-
+  dbDisconnect(con)
+  return (luftdaten.sensors)
+  
+}
+
+load.luftdaten.sensors.with.data.and.dwd.station <- function() {
+ 
+  luftdaten.sensors <-load.luftdaten.sensors.with.data()
     luftdaten.sensors %>% filter(sensor_type_id == 14 |
                                    sensor_type_id == 17)
   
@@ -161,7 +181,7 @@ load.luftdaten.sensors <- function() {
   luftdaten.sensors <-
     luftdaten.sensors %>% arrange(distance.to.dwd)
   
-  dbDisconnect(con)
+
   return (luftdaten.sensors)
 }
 

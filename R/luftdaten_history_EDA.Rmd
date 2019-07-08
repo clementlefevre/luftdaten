@@ -1,17 +1,16 @@
 ---
 title: "R Notebook"
-output: html_notebook
+output: rmarkdown::github_document
+
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
 
 ```{r}
 library(tidyverse)
 library(lubridate)
 library(plotly)
 source('service/dbservice.R')
+source('service/geoservice.R')
 ```
 ```{r}
 df.history <- load.luftdaten.record.history.per.sensor()
@@ -48,5 +47,39 @@ p
 groupy <- df.history.country %>% filter(date==as.Date('2019-06-01') & sensor_type_name=='bme280') %>% top_n(10,records)
 
 ggplot(groupy,aes(reorder(location_country,-records),records, fill=location_country))+geom_bar(stat="identity")
+```
+## ratio bme/sds011 per location
+```{r}
+df.sensors <- load.luftdaten.sensors()
+
+groupy <- df.sensors %>% group_by(location_id,sensor_type_name) %>% summarise(total = n()) %>% spread(sensor_type_name,total)
+df.equipement.per.location <-as.data.frame((1-colMeans(is.na(groupy)))*100)
+colnames(df.equipement.per.location)<-c('percent_equiped')
+df.equipement.per.location <- df.equipement.per.location %>% rownames_to_column('sensor_type_name')
+
+ggplot(df.equipement.per.location ,aes(reorder(sensor_type_name,-percent_equiped),percent_equiped))+geom_bar(stat="identity")+
+  theme(axis.text.x = element_text(angle = 90))
+
+
+```
+
+## get location with both BME280 AND DHT22 for which we have data
+```{r}
+locationsDHT22_AND_BME280 <-groupy %>% filter(BME280>0 & DHT22>0) %>% pull(location_id)
+
+sensors.with.data <- load.luftdaten.sensors.with.data()%>% filter(location_id %in% locationsDHT22_AND_BME280)
+locationWithDataWithBME280_and_DHT22 <- sensors.with.data %>% filter(sensor_type_id==9) %>% pull(location_id)
+
+sensors_for_those_locations <-sensors.with.data %>% filter(location_id %in% locationWithDataWithBME280_and_DHT22) %>% pull(sensor_id)
+
+df<- prepare.data('None',sensors_for_those_locations)
+df <- merge(df,df.sensors %>% select(location_id,sensor_id),by='sensor_id')
+
+
+ggplot(df %>% filter( variable=='humidity'),aes(datetime,value,color=sensor_id))+ geom_line()+facet_wrap(.~location_id,nrow = 3)
+ggplot(df %>% filter( variable=='humidity'),aes(value,color=sensor_id))+ geom_histogram()+facet_wrap(.~sensor_id,nrow = 3)
+```
+```{r}
+
 ```
 
