@@ -1,6 +1,8 @@
 ---
 title: "R Notebook"
-output: html_notebook
+output: github_document
+always_allow_html: yes
+ 
 ---
 
 This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
@@ -64,17 +66,21 @@ ggplot(df.equipement.per.location ,aes(reorder(sensor_type_name,-percent_equiped
 
 
 ```
+# We need to talk about Kelvin
 
 ## get location with both BME280 AND DHT22
 ```{r}
 locationsDHT22_AND_BME280 <-groupy %>% filter(BME280>0 & DHT22>0) %>% pull(location_id)
 
-sensors.with.data <- load.luftdaten.sensors.with.data() %>% filter(location_id %in% locationsDHT22_AND_BME280)
+location.with.data.and.both.sensors<- load.luftdaten.sensors.with.data() %>% filter(location_id %in% locationsDHT22_AND_BME280) %>% filter(sensor_type_id==9) %>% pull(location_id)
 
-sensors_id <- df.sensors %>% filter(location_id %in%  locationsDHT22_AND_BME280)
-df <- prepare.data('None',c(140))
+sensors_to_extract <- df.sensors %>% filter(location_id %in% location.with.data.and.both.sensors) %>% pull(sensor_id)
+
+df <- prepare.data('None',sensors_to_extract) %>% filter(variable=='humidity')
+
+df <-  merge(df,df.sensors %>% select(location_id,sensor_id,sensor_type_name),by='sensor_id')
 ```
 ```{r}
-
+ggplot(df,aes(datetime,value,color=sensor_type_name))+ geom_line(size=.1)+facet_wrap(.~location_id,nrow=3)+ theme(legend.position="bottom")
 ```
 

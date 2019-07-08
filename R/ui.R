@@ -33,6 +33,7 @@ shinyUI(fluidPage(
     # Show a plot of the generated distribution
     mainPanel(
       tabsetPanel(
+        tabPanel('Rmd', uiOutput('markdown')),
         tabPanel("Map", leafletOutput("map.dwd")),
         tabPanel("Timeline", plotlyOutput("plot.timeline"), plotOutput("cross_correlation_plot")
                 ),

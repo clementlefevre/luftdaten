@@ -12,12 +12,19 @@ library(tidyverse)
 library(plotly)
 library(viridis)
 library(gridExtra)
+library(knitr)
 
 
 
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output, session) {
+  
+  output$markdown <- renderUI({
+    withMathJax(includeMarkdown("luftdaten_history_EDA.md"))
+  })
+  
+  
   haehnel <- NULL
   
   haehnel <-

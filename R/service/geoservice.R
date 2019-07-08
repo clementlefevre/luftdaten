@@ -70,6 +70,7 @@ prepare.data <- function(dwdStationCode = 'None', sensors_id) {
     df.dwd <-
       df.dwd %>% rename(sensor_id = station_code, variable = pollutant)
     df.dwd$datetime <-  as_datetime(df.dwd$timestamp_gmt)
+    df.dwd <- df.dwd %>%  select(-timestamp_gmt)
     
     df <-
       bind_rows(df.dwd, df.luftdaten) %>%  distinct(sensor_id, datetime, variable, .keep_all = TRUE)
@@ -83,5 +84,5 @@ prepare.data <- function(dwdStationCode = 'None', sensors_id) {
   start.data <-  df %>% dplyr::filter(variable == 'P1') %>% pull(datetime)
   df <- df %>% dplyr::filter(datetime >= min(start.data))
   
-  return (df %>% select(-timestamp_gmt))
+  return (df)
 }
