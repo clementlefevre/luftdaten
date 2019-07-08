@@ -26,6 +26,7 @@ shinyServer(function(input, output, session) {
       df <-  data.plot()$spreado %>% filter(!is.na(humidity.rm))
      
       rh <- df$humidity.rm / 100
+      rh[rh==1]<- .9999
       beta_haehnel <- input$slider.haehnel.beta
       haehnel <- df$P1.rm * ((1 - rh) ^ beta_haehnel)
       haehnel
@@ -69,6 +70,10 @@ shinyServer(function(input, output, session) {
       data$sensors_info <- luftdaten.sensors.selected
       data$df <- prepare.data(dwd.station.id, sensors_id)
       
+      
+      
+      
+
       spreado <-
         spread.data(data$df)  %>% filter(!is.na(humidity.rm)) %>% filter(!is.na(P1.rm))
       
@@ -77,6 +82,8 @@ shinyServer(function(input, output, session) {
       } else{
         spreado <- spreado %>% mutate(PM10.rm=lead(PM10.rm,input$slider.lag*-1))
       }
+      
+     
     
      
       data$spreado <- spreado
@@ -158,7 +165,7 @@ shinyServer(function(input, output, session) {
         name = 'PM10',
         type = 'scatter',
         mode = 'lines',
-        line = list(color = 'rgb(94,182,104)', width = 1)
+        line = list(color = 'rgb(245, 176, 66)', width = 1)
       ) %>%
       add_trace(
         y = ~ P1.rm,
@@ -168,7 +175,7 @@ shinyServer(function(input, output, session) {
       add_trace(
         y = ~ haehnel,
         name = 'P1.haehnel',
-        line = list(color = 'rgb(245, 176, 66)', width = 1)
+        line = list(color = 'rgb(94,182,104)', width = 1)
       )  %>% 
       add_trace( y = ~aqi.good, name = 'AQI Good', fill = 'tozeroy',
                    fillcolor = aqi.good.rgba,
@@ -245,6 +252,40 @@ shinyServer(function(input, output, session) {
      hjust   = -0.1,
      vjust   = -1
    ) + facet_grid(.~key)
+  })
+  
+  output$plot.DWD_vs_Luftdaten.humidity <- renderPlot({
+    df <- data.plot()$spreado  %>% filter(!is.na(humidity.rm))
+    df$haehnel <- haehnel()
+    
+    df$ratio.1 <- df$PM10.rm /df$P1.rm
+    df$ratio.2 <- df$PM10.rm / df$haehnel
+    
+    
+    
+    model.1 <- lm(data = df, ratio.1 ~ humidity.rm)
+    rmse.1 <- sqrt(mean(model.1$residuals^2))
+    adjusted_r2.1 <-  paste0('Adj.R2 : ',round(summary(model.1)$adj.r.squared,2) ,'- rmse: ',rmse.1)
+    
+    df <- df %>% na.omit(.)
+ 
+    model.2 <- lm(data = df, ratio.2 ~ humidity.rm)
+    rmse.2 <-sqrt(mean(model.2$residuals^2))
+    adjusted_r2.2 <- paste0('Adj.R2 : ',round(summary(model.2)$adj.r.squared,2), '- rmse: ',rmse.2)
+    
+    
+    gato <- df %>% select(datetime,ratio.1,ratio.2,humidity.rm,temperature.rm)
+    
+    
+    gato <- gato %>% gather(key,value,-datetime,-humidity.rm,-temperature.rm)
+    
+  
+    
+    
+    p<- ggplot(gato,aes(humidity.rm,value))+ geom_point(aes(alpha=.2,color=temperature.rm),size=.5)+ylim(0,10)+ geom_hline(yintercept=1, linetype="dashed", 
+                                                                                                                           color = "red", size=2)
+    
+    p + facet_grid(.~key)
   })
 
   

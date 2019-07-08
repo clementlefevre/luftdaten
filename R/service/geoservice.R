@@ -77,10 +77,11 @@ prepare.data <- function(dwdStationCode = 'None', sensors_id) {
   } else{
     df<-df.luftdaten
   }
-  
  
+  
+ df <- df %>% arrange(datetime)
   start.data <-  df %>% dplyr::filter(variable == 'P1') %>% pull(datetime)
   df <- df %>% dplyr::filter(datetime >= min(start.data))
   
-  return (df)
+  return (df %>% select(-timestamp_gmt))
 }

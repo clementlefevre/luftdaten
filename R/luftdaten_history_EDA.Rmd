@@ -1,10 +1,11 @@
 ---
 title: "R Notebook"
-output: rmarkdown::github_document
-always_allow_html: yes
-
+output: html_notebook
 ---
 
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
 
 ```{r}
 library(tidyverse)
@@ -30,7 +31,7 @@ ggplot(df.history.ratio %>% filter(date>=as.Date('2017-01-01')),aes(date,value,f
 ```{r}
 
 p <-ggplot(df.history,aes(date,records))+ geom_line(aes(colour=sensor_type_name))
-p
+ggplotly(p)
 ```
 # plot per country
 ```{r}
@@ -64,21 +65,14 @@ ggplot(df.equipement.per.location ,aes(reorder(sensor_type_name,-percent_equiped
 
 ```
 
-## get location with both BME280 AND DHT22 for which we have data
+## get location with both BME280 AND DHT22
 ```{r}
 locationsDHT22_AND_BME280 <-groupy %>% filter(BME280>0 & DHT22>0) %>% pull(location_id)
 
-sensors.with.data <- load.luftdaten.sensors.with.data()%>% filter(location_id %in% locationsDHT22_AND_BME280)
-locationWithDataWithBME280_and_DHT22 <- sensors.with.data %>% filter(sensor_type_id==9) %>% pull(location_id)
+sensors.with.data <- load.luftdaten.sensors.with.data() %>% filter(location_id %in% locationsDHT22_AND_BME280)
 
-sensors_for_those_locations <-sensors.with.data %>% filter(location_id %in% locationWithDataWithBME280_and_DHT22) %>% pull(sensor_id)
-
-df<- prepare.data('None',sensors_for_those_locations)
-df <- merge(df,df.sensors %>% select(location_id,sensor_id),by='sensor_id')
-
-
-ggplot(df %>% filter( variable=='humidity'),aes(datetime,value,color=sensor_id))+ geom_line()+facet_wrap(.~location_id,nrow = 3)
-ggplot(df %>% filter( variable=='humidity'),aes(value,color=sensor_id))+ geom_histogram()+facet_wrap(.~sensor_id,nrow = 3)
+sensors_id <- df.sensors %>% filter(location_id %in%  locationsDHT22_AND_BME280)
+df <- prepare.data('None',c(140))
 ```
 ```{r}
 

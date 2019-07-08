@@ -37,7 +37,8 @@ shinyUI(fluidPage(
         tabPanel("Timeline", plotlyOutput("plot.timeline"), plotOutput("cross_correlation_plot")
                 ),
         tabPanel("Relationships", 
-                 plotOutput("plot.DWD_vs_Luftdaten"))
+                 plotOutput("plot.DWD_vs_Luftdaten"),
+                 plotOutput("plot.DWD_vs_Luftdaten.humidity"))
       )
     )
   )
