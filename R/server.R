@@ -13,32 +13,43 @@ library(plotly)
 library(viridis)
 library(gridExtra)
 library(knitr)
+source('service/plotservice.R')
+source('service/growth_functions.R')
 
 
 
-
-# Define server logic required to draw a histogram
 shinyServer(function(input, output, session) {
-  
   output$markdown <- renderUI({
     withMathJax(includeMarkdown("luftdaten_history_EDA.md"))
   })
   
-  
-  haehnel <- NULL
-  
-  haehnel <-
-    eventReactive(c(input$slider.haehnel.beta, input$locationChoice), {
-     
-      df <-  data.plot()$spreado %>% filter(!is.na(humidity.rm))
-     
-      rh <- df$humidity.rm / 100
-      rh[rh==1]<- .9999
-      beta_haehnel <- input$slider.haehnel.beta
-      haehnel <- df$P1.rm * ((1 - rh) ^ beta_haehnel)
-      haehnel
+  output$growth.function.def <- renderUI({
+    text<-switch(input$function.adjust,
+           'haehnel' = "$$gf_{Haehnel} = \\frac{1}{(1-rh)^\\beta}$$",
+           'soneja' = "$$gf_{Soneja} = 1 + \\frac{\\alpha rh^2}{1-rh}$$",
+           'combo' = "$$gf_{combo} = 1 + \\frac{\\alpha rh^2}{(1-rh)^\\beta}$$",
+           'skupin'="$$\\epsilon^2$$")
     
-      
+    
+    print(text)
+    
+    withMathJax(helpText(text))
+  }
+  )
+  
+    
+  
+  
+  adjusted <- NULL
+  
+  adjusted <-
+    eventReactive(c(input$slider.alpha,input$slider.beta,input$function.adjust, input$locationChoice), {
+      df <-  data.plot()$spreado  %>% filter(!is.na(humidity.rm))
+      rh <- df$humidity.rm / 100
+      rh[rh == 1] <- .9999
+      growth.factor <- growthFunction(input$function.adjust,rh,input$slider.alpha,input$slider.beta)
+      adjusted <-df$P1.rm *  growth.factor
+      adjusted
     })
   
   
@@ -57,7 +68,7 @@ shinyServer(function(input, output, session) {
   
   
   data.plot <-
-    eventReactive(c(input$locationChoice,input$slider.lag), {
+    eventReactive(c(input$locationChoice, input$slider.lag), {
       # add input$map.dwd_marker_click if selection from map
       req(input$locationChoice)
       selected_location_id <- isolate(input$locationChoice)
@@ -77,27 +88,18 @@ shinyServer(function(input, output, session) {
       data$sensors_info <- luftdaten.sensors.selected
       data$df <- prepare.data(dwd.station.id, sensors_id)
       
-      
-      
-      
-
       spreado <-
         spread.data(data$df)  %>% filter(!is.na(humidity.rm)) %>% filter(!is.na(P1.rm))
       
-      if(input$slider.lag>=0){
-        spreado <- spreado %>% mutate(PM10.rm=lag(PM10.rm,input$slider.lag))
+      if (input$slider.lag >= 0) {
+        spreado <- spreado %>% mutate(PM10.rm = lag(PM10.rm, input$slider.lag))
       } else{
-        spreado <- spreado %>% mutate(PM10.rm=lead(PM10.rm,input$slider.lag*-1))
+        spreado <-
+          spreado %>% mutate(PM10.rm = lead(PM10.rm, input$slider.lag * -1))
       }
       
-     
+        data$spreado <- spreado
     
-     
-      data$spreado <- spreado
-      
-      
-      
-      
       data
     })
   
@@ -133,96 +135,31 @@ shinyServer(function(input, output, session) {
         radius = 6,
         stroke = TRUE,
         fillOpacity = 1,
-        color = 'red'
+        color = 'rgb(115,207,201)'
       )  %>%   addCircleMarkers(
         lng = dwd.station.longi,
         lat = dwd.station.lati,
         radius = 8,
         stroke = TRUE,
-        color = 'blue',
+        color = 'rgb(45,75,155)',
         fillOpacity = 1
       )
     m.detailed
   })
   
   output$plot.timeline <- renderPlotly({
-   
     df <- data.plot()$spreado  %>% arrange(datetime)
+    df$haehnel <- adjusted()
+    plotTimeLine(df)
+    
    
-    df$haehnel <- haehnel()
-    aqi.good.rgba <- 'rgba(166,221,171,0.4)'
-    aqi.soso.rgba <- 'rgba(254,255,160,0.4)'
-    aqi.bad.rgba <- 'rgba(227,111,72,0.4)'
-    
-    df$aqi.good <- 13
-    
-    df$aqi.bad <- 200
-    
- 
-    df$aqi.soso <- 50
-    
-    
-    
-    
-    p1 <-
-      plot_ly(
-        df,
-        x = ~ datetime,
-        y = ~ PM10.rm,
-        name = 'PM10',
-        type = 'scatter',
-        mode = 'lines',
-        line = list(color = 'rgb(245, 176, 66)', width = 1)
-      ) %>%
-      add_trace(
-        y = ~ P1.rm,
-        name = 'P1',
-        line = list(color = 'rgb(0,66,37)', width = 1)
-      ) %>%
-      add_trace(
-        y = ~ haehnel,
-        name = 'P1.haehnel',
-        line = list(color = 'rgb(94,182,104)', width = 1)
-      )  %>% 
-      add_trace( y = ~aqi.good, name = 'AQI Good', fill = 'tozeroy',
-                   fillcolor = aqi.good.rgba,
-                 line = list(color = aqi.good.rgba, width = 0)) %>%
-      add_trace(y = ~aqi.soso, type = 'scatter', mode = 'lines',fill = 'tonexty', fillcolor=aqi.soso.rgba, line = list(color =aqi.soso.rgba),
-                                                                           showlegend = FALSE, name = 'AQI SOSO') %>%
-      add_trace(y = ~aqi.bad, type = 'scatter', mode = 'lines',fill = 'tonexty', fillcolor=aqi.bad.rgba, line = list(color =aqi.bad.rgba),
-                showlegend = FALSE, name = 'AQI SOSO')
-    
-    p2 <-
-      plot_ly(
-        df,
-        x = ~ datetime,
-        y = ~ humidity.rm,
-        type = 'scatter',
-        mode = 'lines',
-        name = 'humidity',
-        line = list(color = 'rgb(92,184,178)', width = 1)
-      )
-    
-    p3 <-
-      plot_ly(
-        df,
-        x = ~ datetime,
-        y = ~ temperature.rm,
-        
-        type = 'scatter',
-        mode = 'lines',
-        name = 'temperature',
-        line = list(color = 'rgb(255,162,10)', width = 1)
-      )
-    
-    p <- subplot(p1, p2, nrows = 2, shareX = TRUE,heights = c(0.7, 0.3))
-    p
   })
   
   output$cross_correlation_plot <- renderPlot({
     df <-
       data.plot()$spreado  %>% filter(!is.na(P1.rm) &
-                                        !is.na(PM10.rm) & !is.na(temperature.rm) & !is.na(humidity.rm))
+                                        !is.na(PM10.rm) &
+                                        !is.na(temperature.rm) & !is.na(humidity.rm))
     ccf(df$PM10.rm, df$P1.rm)
     
   })
@@ -230,70 +167,95 @@ shinyServer(function(input, output, session) {
   
   output$plot.DWD_vs_Luftdaten <- renderPlot({
     df <- data.plot()$spreado  %>% filter(!is.na(humidity.rm))
-    df$haehnel <- haehnel()
+
+    df$adjusted <- adjusted()
     
     model.1 <- lm(data = df, P1.rm ~ PM10.rm)
-    rmse.1 <- sqrt(mean(model.1$residuals^2))
-    adjusted_r2.1 <-  paste0('Adj.R2 : ',round(summary(model.1)$adj.r.squared,2) ,'- rmse: ',rmse.1)
+    rmse.1 <- sqrt(mean(model.1$residuals ^ 2))
+    adjusted_r2.1 <-
+      paste0('Adj.R2 : ',
+             round(summary(model.1)$adj.r.squared, 2) ,
+             '- rmse: ',
+             rmse.1)
     
     
-    model.2 <- lm(data = df, haehnel ~ PM10.rm)
-    rmse.2 <-sqrt(mean(model.2$residuals^2))
-    adjusted_r2.2 <- paste0('Adj.R2 : ',round(summary(model.2)$adj.r.squared,2), '- rmse: ',rmse.2)
+    model.2 <- lm(data = df, adjusted ~ PM10.rm)
+    rmse.2 <- sqrt(mean(model.2$residuals ^ 2))
+    adjusted_r2.2 <-
+      paste0('Adj.R2 : ',
+             round(summary(model.2)$adj.r.squared, 2),
+             '- rmse: ',
+             rmse.2)
     
-  
-    gato <- df %>% select(datetime,PM10.rm,P1.rm,humidity.rm,haehnel)
-    gato <- gato %>% gather(key,value,-datetime,-PM10.rm,-humidity.rm)
+    
+    gato <-
+      df %>% select(datetime, PM10.rm, P1.rm, humidity.rm, adjusted)
+    gato <-
+      gato %>% gather(key, value, -datetime, -PM10.rm, -humidity.rm)
     
     dat_text <- data.frame(
       label = c(adjusted_r2.1, adjusted_r2.2),
-      key   = c('P1.rm', 'haehnel')
+      key   = c('P1.rm', 'adjusted')
     )
-
-
-   p<- ggplot(gato,aes(PM10.rm,value))+ geom_point(aes(color=humidity.rm))+scale_color_viridis(direction=-1)+xlim(0,100)+ylim(0,100)
-  
-   p + geom_text(
-     data    = dat_text,
-     mapping = aes(x = 20, y = 90, label = label),
-     hjust   = -0.1,
-     vjust   = -1
-   ) + facet_grid(.~key)
+    
+    
+    p <-
+      ggplot(gato, aes(PM10.rm, value)) + geom_point(aes(color = humidity.rm,alpha=.2),size=.5) +
+      scale_color_viridis(direction = -1) + xlim(0, 100) + ylim(0, 100)
+    
+    p + geom_text(
+      data    = dat_text,
+      mapping = aes(x = 20, y = 90, label = label),
+      hjust   = -0.1,
+      vjust   = -1
+    ) + facet_grid(. ~ key)
   })
   
   output$plot.DWD_vs_Luftdaten.humidity <- renderPlot({
     df <- data.plot()$spreado  %>% filter(!is.na(humidity.rm))
-    df$haehnel <- haehnel()
+    df$adjusted <- adjusted()
     
-    df$ratio.1 <- df$PM10.rm /df$P1.rm
-    df$ratio.2 <- df$PM10.rm / df$haehnel
+    df$ratio.2 <- df$PM10.rm / df$P1.rm
+    df$ratio.1 <- df$PM10.rm / df$adjusted
     
     
     
     model.1 <- lm(data = df, ratio.1 ~ humidity.rm)
-    rmse.1 <- sqrt(mean(model.1$residuals^2))
-    adjusted_r2.1 <-  paste0('Adj.R2 : ',round(summary(model.1)$adj.r.squared,2) ,'- rmse: ',rmse.1)
+    rmse.1 <- sqrt(mean(model.1$residuals ^ 2))
+    adjusted_r2.1 <-
+      paste0('Adj.R2 : ',
+             round(summary(model.1)$adj.r.squared, 2) ,
+             '- rmse: ',
+             rmse.1)
     
     df <- df %>% na.omit(.)
- 
+    
     model.2 <- lm(data = df, ratio.2 ~ humidity.rm)
-    rmse.2 <-sqrt(mean(model.2$residuals^2))
-    adjusted_r2.2 <- paste0('Adj.R2 : ',round(summary(model.2)$adj.r.squared,2), '- rmse: ',rmse.2)
+    rmse.2 <- sqrt(mean(model.2$residuals ^ 2))
+    adjusted_r2.2 <-
+      paste0('Adj.R2 : ',
+             round(summary(model.2)$adj.r.squared, 2),
+             '- rmse: ',
+             rmse.2)
     
     
-    gato <- df %>% select(datetime,ratio.1,ratio.2,humidity.rm,temperature.rm)
+    gato <-
+      df %>% select(datetime, ratio.1, ratio.2, humidity.rm, temperature.rm)
     
+    gato <-
+      gato %>% gather(key, value, -datetime, -humidity.rm, -temperature.rm)
     
-    gato <- gato %>% gather(key,value,-datetime,-humidity.rm,-temperature.rm)
+    p <-
+      ggplot(gato, aes(humidity.rm, value)) + geom_point(aes(alpha = .2, color =
+                                                               temperature.rm), size = .5) + ylim(0, 10) + geom_hline(
+                                                                 yintercept = 1,
+                                                                 linetype = "dashed",
+                                                                 color = "red",
+                                                                 size = 2
+                                                               )+scale_color_viridis(option="magma")
     
-  
-    
-    
-    p<- ggplot(gato,aes(humidity.rm,value))+ geom_point(aes(alpha=.2,color=temperature.rm),size=.5)+ylim(0,10)+ geom_hline(yintercept=1, linetype="dashed", 
-                                                                                                                           color = "red", size=2)
-    
-    p + facet_grid(.~key)
+    p + facet_grid(. ~ key)
   })
-
+  
   
 })

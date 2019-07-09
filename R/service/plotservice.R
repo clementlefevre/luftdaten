@@ -1,18 +1,13 @@
 
 plotTimeLine <- function(df){
  
-  aqi.good.rgba <- 'rgba(166,221,171,0.4)'
-  aqi.soso.rgba <- 'rgba(254,255,160,0.4)'
-  aqi.bad.rgba <- 'rgba(227,111,72,0.4)'
+  aqi.good.rgba <- 'rgba(122,217,105,.8)'
+  aqi.soso.rgba <- 'rgba(249,158,56,.8)'
+  aqi.bad.rgba <- 'rgba(227,111,72,0.8)'
   
   df$aqi.good <- 13
-  
   df$aqi.bad <- 200
-  
-  
   df$aqi.soso <- 50
-  
-  
   
   
   p1 <-
@@ -20,47 +15,47 @@ plotTimeLine <- function(df){
       df,
       x = ~ datetime,
       y = ~ PM10.rm,
-      name = 'PM10',
+      name = 'PM10 DWD',
       type = 'scatter',
       mode = 'lines',
-      line = list(color = 'rgb(245, 176, 66)', width = 1)
+      line = list(color = 'rgb(45,75,155)', width = 1)
     ) %>%
     add_trace(
       y = ~ P1.rm,
-      name = 'P1',
-      line = list(color = 'rgb(0,66,37)', width = 1)
+      name = 'P1 Luftdaten',
+      line = list(color = 'rgb(115,207,201)', width = 1)
     ) %>%
     add_trace(
       y = ~ haehnel,
-      name = 'P1.haehnel',
-      line = list(color = 'rgb(94,182,104)', width = 1)
+      name = 'P1 w/ growth function',
+      line = list(color = 'rgb(255,78,132)', width = 1.5)
     )  %>%
     add_trace(
       y = ~ aqi.good,
       name = 'AQI Good',
-      fill = 'tozeroy',
-      fillcolor = aqi.good.rgba,
-      line = list(color = aqi.good.rgba, width = 0)
+      # fill = 'tozeroy',
+      # fillcolor = aqi.good.rgba,
+      line = list(color = aqi.good.rgba, width = 3,dash='dot')
     ) %>%
     add_trace(
       y = ~ aqi.soso,
       type = 'scatter',
       mode = 'lines',
-      fill = 'tonexty',
-      fillcolor = aqi.soso.rgba,
-      line = list(color = aqi.soso.rgba),
-      showlegend = FALSE,
+      # fill = 'tonexty',
+      # fillcolor = aqi.soso.rgba,
+      line = list(color = aqi.soso.rgba,width=3,dash='dot'),
+      showlegend = TRUE,
       name = 'AQI SOSO'
     ) %>%
     add_trace(
       y = ~ aqi.bad,
       type = 'scatter',
       mode = 'lines',
-      fill = 'tonexty',
-      fillcolor = aqi.bad.rgba,
+      # fill = 'tonexty',
+      # fillcolor = aqi.bad.rgba,
       line = list(color = aqi.bad.rgba),
-      showlegend = FALSE,
-      name = 'AQI SOSO'
+      showlegend = TRUE,
+      name = 'AQI BAD'
     )
   
   p2 <-
@@ -71,7 +66,7 @@ plotTimeLine <- function(df){
       type = 'scatter',
       mode = 'lines',
       name = 'humidity',
-      line = list(color = 'rgb(92,184,178)', width = 1)
+      line = list(color = 'rgb(14,54,124)', width = 1)
     )
   
   p3 <-
