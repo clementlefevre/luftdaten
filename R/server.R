@@ -28,7 +28,13 @@ shinyServer(function(input, output, session) {
            'haehnel' = "$$gf_{Haehnel} = \\frac{1}{(1-rh)^\\beta}$$",
            'soneja' = "$$gf_{Soneja} = 1 + \\frac{\\alpha rh^2}{1-rh}$$",
            'combo' = "$$gf_{combo} = 1 + \\frac{\\alpha rh^2}{(1-rh)^\\beta}$$",
-           'skupin'="$$\\epsilon^2$$")
+           'skupin'="$$gf_{Skupin} = \\left\\{
+    \\begin{array}{ll}
+        \\frac{\\alpha}{(1-rh)^\\beta} & \\mbox{if } rh \\ge 0.7 \\\\
+        \\frac{1}{(1-rh)^{\\beta-\\frac{log(a)}{log(0.3)}}} & \\mbox{if } rh < 0.7 \\\\
+    \\end{array}
+\\right.
+$$")
     
     
     print(text)
@@ -200,7 +206,7 @@ shinyServer(function(input, output, session) {
     
     
     p <-
-      ggplot(gato, aes(PM10.rm, value)) + geom_point(aes(color = humidity.rm,alpha=.2),size=.5) +
+      ggplot(gato, aes(PM10.rm, value)) + geom_point(aes(color = humidity.rm),size=.5,alpha=.2) +
       scale_color_viridis(direction = -1) + xlim(0, 100) + ylim(0, 100)
     
     p + geom_text(
@@ -246,8 +252,8 @@ shinyServer(function(input, output, session) {
       gato %>% gather(key, value, -datetime, -humidity.rm, -temperature.rm)
     
     p <-
-      ggplot(gato, aes(humidity.rm, value)) + geom_point(aes(alpha = .2, color =
-                                                               temperature.rm), size = .5) + ylim(0, 10) + geom_hline(
+      ggplot(gato, aes(humidity.rm, value)) + geom_point(aes( color =
+                                                               temperature.rm),alpha = .2, size = .5) + ylim(0, 10) + geom_hline(
                                                                  yintercept = 1,
                                                                  linetype = "dashed",
                                                                  color = "red",

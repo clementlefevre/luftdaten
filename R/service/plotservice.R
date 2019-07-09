@@ -28,35 +28,36 @@ plotTimeLine <- function(df){
     add_trace(
       y = ~ haehnel,
       name = 'P1 w/ growth function',
-      line = list(color = 'rgb(255,78,132)', width = 1.5)
-    )  %>%
-    add_trace(
-      y = ~ aqi.good,
-      name = 'AQI Good',
-      # fill = 'tozeroy',
-      # fillcolor = aqi.good.rgba,
-      line = list(color = aqi.good.rgba, width = 3,dash='dot')
-    ) %>%
-    add_trace(
-      y = ~ aqi.soso,
-      type = 'scatter',
-      mode = 'lines',
-      # fill = 'tonexty',
-      # fillcolor = aqi.soso.rgba,
-      line = list(color = aqi.soso.rgba,width=3,dash='dot'),
-      showlegend = TRUE,
-      name = 'AQI SOSO'
-    ) %>%
-    add_trace(
-      y = ~ aqi.bad,
-      type = 'scatter',
-      mode = 'lines',
-      # fill = 'tonexty',
-      # fillcolor = aqi.bad.rgba,
-      line = list(color = aqi.bad.rgba),
-      showlegend = TRUE,
-      name = 'AQI BAD'
-    )
+      line = list(color = 'rgb(218,93,120)', width = 1)) %>%
+        layout( yaxis = list(range = c(0, 100),title=''))
+    # )  %>%
+    # add_trace(
+    #   y = ~ aqi.good,
+    #   name = 'AQI Good',
+    #   # fill = 'tozeroy',
+    #   # fillcolor = aqi.good.rgba,
+    #   line = list(color = aqi.good.rgba, width = 3,dash='dot')
+    # ) %>%
+    # add_trace(
+    #   y = ~ aqi.soso,
+    #   type = 'scatter',
+    #   mode = 'lines',
+    #   # fill = 'tonexty',
+    #   # fillcolor = aqi.soso.rgba,
+    #   line = list(color = aqi.soso.rgba,width=3,dash='dot'),
+    #   showlegend = TRUE,
+    #   name = 'AQI SOSO'
+    # ) %>%
+    # add_trace(
+    #   y = ~ aqi.bad,
+    #   type = 'scatter',
+    #   mode = 'lines',
+    #   # fill = 'tonexty',
+    #   # fillcolor = aqi.bad.rgba,
+    #   line = list(color = aqi.bad.rgba),
+    #   showlegend = TRUE,
+    #   name = 'AQI BAD'
+    # ) 
   
   p2 <-
     plot_ly(
@@ -66,8 +67,8 @@ plotTimeLine <- function(df){
       type = 'scatter',
       mode = 'lines',
       name = 'humidity',
-      line = list(color = 'rgb(14,54,124)', width = 1)
-    )
+      line = list(color = 'rgb(122,217,105)', width = 1.5)
+    ) %>% layout(xaxis=list(title=''))
   
   p3 <-
     plot_ly(

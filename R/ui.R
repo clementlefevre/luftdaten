@@ -42,15 +42,13 @@ shinyUI(fluidPage(theme = shinytheme("readable"),
                  fluidRow(column(12,
                                  fluidRow(
                                    
-                                   column(4,  radioButtons("function.adjust", "Growth function :",
+                                   column(8,  selectInput("function.adjust", "Growth function :",
                                                            c("Haehnel" = "haehnel",
                                                              "Soneja" = "soneja",
                                                              "Combo" = "combo",
                                                              "Skupin" = "skupin"
-                                                           ))),
-                                   column(4,uiOutput('growth.function.def')
-                                          
-                                         ),
+                                                           )),uiOutput('growth.function.def')),
+                                  
                                    column(4,  sliderInput("slider.alpha", label = "\u03B1",step=.05, min = 0, 
                                                           max = 30, value = .5),sliderInput("slider.beta", label = "\u03B2",step=.05, min = 0, 
                                                          max = 3, value = .5))
