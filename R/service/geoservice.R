@@ -84,5 +84,5 @@ prepare.data <- function(dwdStationCode = 'None', sensors_id) {
   start.data <-  df %>% dplyr::filter(variable == 'P1') %>% pull(datetime)
   df <- df %>% dplyr::filter(datetime >= min(start.data))
   
-  return (df)
+  return (df %>% na.omit(.))
 }
