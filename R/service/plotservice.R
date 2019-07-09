@@ -10,8 +10,12 @@ plotTimeLine <- function(df){
   df$aqi.soso <- 50
   
   
-  p1 <-
-    plot_ly(
+  df <- df %>% mutate(rh.ge.70=as.numeric(humidity.rm>=70)*100)
+  
+
+  
+  #browser()
+  p1 <-    plot_ly(
       df,
       x = ~ datetime,
       y = ~ PM10.rm,
@@ -28,8 +32,15 @@ plotTimeLine <- function(df){
     add_trace(
       y = ~ haehnel,
       name = 'P1 w/ growth function',
-      line = list(color = 'rgb(218,93,120)', width = 1)) %>%
-        layout( yaxis = list(range = c(0, 100),title=''))
+      line = list(color = 'rgb(218,93,120)', width = 1))   %>%
+  add_trace(
+    y = ~ rh.ge.70,
+    name = 'Humidity>70%',
+    fill = 'tozeroy',
+    fillcolor = 'rgba(181,227,181,.4)',
+    line = list(color = 'rgba(181,227,181)', width = 0)
+  ) %>%
+    layout( yaxis = list(range = c(0, 100),title=''))
     # )  %>%
     # add_trace(
     #   y = ~ aqi.good,
@@ -90,6 +101,8 @@ plotTimeLine <- function(df){
       shareX = TRUE,
       heights = c(0.7, 0.3)
     )
+  
+  return(p1)
   return(p)
   
 }

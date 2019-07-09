@@ -204,7 +204,7 @@ $$")
       key   = c('P1.rm', 'adjusted')
     )
     
-    
+  
     p <-
       ggplot(gato, aes(PM10.rm, value)) + geom_point(aes(color = humidity.rm),size=.5,alpha=.2) +
       scale_color_viridis(direction = -1) + xlim(0, 100) + ylim(0, 100)
