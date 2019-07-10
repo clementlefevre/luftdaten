@@ -10,6 +10,7 @@
 library(shiny)
 library(plotly)
 library(shinythemes)
+library(DT)
 
 # Define UI for application that draws a histogram
 shinyUI(fluidPage(theme = shinytheme("readable"),
@@ -52,6 +53,7 @@ shinyUI(fluidPage(theme = shinytheme("readable"),
                     mainPanel(width=10,tabsetPanel( 
                       tabPanel('Rmd', uiOutput('markdown')),
                       tabPanel("Map", leafletOutput("map.dwd")),
+                      tabPanel('Table', DT::dataTableOutput("selected"),DT::dataTableOutput('locationTable')),
                       tabPanel("Timeline",
                                
                                

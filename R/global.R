@@ -82,6 +82,11 @@ luftdaten.sensors.list <-
 luftdaten.sensors.list <-
   luftdaten.sensors.list  %>% filter(sensors_list == "BME280-SDS011") %>% ungroup() %>% arrange(distance.to.dwd, measurements)
 
+
+df.crosscorrelations <- read_df_from_db('autocorrelations')
+
+luftdaten.sensors.list  <- merge(luftdaten.sensors.list,df.crosscorrelations,by='location_id')
+
 pal <- colorFactor(palette = "Spectral",
                    domain = luftdaten.sensors$sensor_type_id)
 

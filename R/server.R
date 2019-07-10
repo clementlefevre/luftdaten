@@ -23,6 +23,26 @@ shinyServer(function(input, output, session) {
     withMathJax(includeMarkdown("luftdaten_history_EDA.md"))
   })
   
+  output$locationTable = DT::renderDataTable(    
+   luftdaten.sensors.list,server = FALSE,selection = "single"
+  ) 
+  
+  selectedRow <- eventReactive(input$locationTable_rows_selected,{
+    
+    row.id <-row.names(luftdaten.sensors.list)[c(input$locationTable_rows_selected)]
+
+    row.selected <- luftdaten.sensors.list[row.id,] #%>% as.list()
+    row.selected
+  })
+  
+  output$selected <- DT::renderDataTable({ 
+    datatable(selectedRow(),rownames = NULL, colnames = NULL, options = list(dom = 't',bSort=FALSE)) %>% formatStyle(
+      'sensor_id',
+      target = 'row',
+      backgroundColor = 'yellow')
+    
+  })
+  
   output$growth.function.def <- renderUI({
     text<-switch(input$function.adjust,
            'haehnel' = "$$gf_{Haehnel} = \\frac{1}{(1-rh)^\\beta}$$",
@@ -66,11 +86,16 @@ $$")
   
   
   data.plot <-
-    eventReactive(c(input$locationChoice, input$slider.lag),{
+    eventReactive(c(input$locationTable_rows_selected, input$slider.lag),{
+      req(input$locationTable_rows_selected)
+      
+      row.selected <- selectedRow() %>% as.list()
+      
+
       # add input$map.dwd_marker_click if selection from map
-      req(input$locationChoice)
      
-      selected_location_id <- isolate(input$locationChoice)
+     
+      selected_location_id <-   row.selected$location_id #isolate(input$locationChoice)
       
       
       luftdaten.sensors.selected <-
@@ -173,8 +198,6 @@ $$")
     return(df)
   }
   
-  
-
   output$plot.DWD_vs_Luftdaten <- renderPlot({
     df <- dataForScatterPlots()
   plotScatter(df,input$function.adjust)
