@@ -15,6 +15,7 @@ library(lubridate)
 library(plotly)
 source('service/dbservice.R')
 source('service/geoservice.R')
+source('global.R')
 ```
 ```{r}
 df.history <- load.luftdaten.record.history.per.sensor()
@@ -83,4 +84,13 @@ df <-  merge(df,df.sensors %>% select(location_id,sensor_id,sensor_type_name),by
 ```{r}
 ggplot(df,aes(datetime,value,color=sensor_type_name))+ geom_line(size=.1)+facet_wrap(.~location_id,nrow=3)+ theme(legend.position="bottom")
 ```
+## CrossCorrelation
 
+
+```{r}
+df.best.acf <- read_df_from_db('autocorrelations')
+
+ggplot(df.best.acf,aes(best.lag,max.acf))+ geom_jitter()
+
+
+```

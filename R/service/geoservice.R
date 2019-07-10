@@ -55,6 +55,64 @@ updateNearestDwdStation <- function() {
             overwrite = T)
 }
 
+## source : https://rstudio-pubs-static.s3.amazonaws.com/9428_1197bd003ebd43c49b429f22ea4f36e5.html
+computeCCF <- function(sensor_id, dwd_station_id,location_id) {
+  result <-  tryCatch({
+    
+    
+    data <- prepare.data(dwd_station_id, c(sensor_id))
+    spreado <-
+      spread.data(data)  %>% filter(!is.na(humidity.rm)) %>% filter(!is.na(P1.rm))
+    
+    df <-
+      spreado  %>% filter(!is.na(P1.rm) &
+                            !is.na(PM10.rm) &
+                            !is.na(temperature.rm) &
+                            !is.na(humidity.rm))
+    
+    
+    correlations <- ccf(df$PM10.rm, df$P1.rm, plot = FALSE)
+    max.acf <- max(correlations$acf)
+    best.lag <- correlations$lag[which.max(correlations$acf)]
+    
+    df <- data.frame(
+      location_id = location_id,
+      sensor_id = sensor_id,
+      dwd_station_id = dwd_station_id,
+      best.lag = best.lag,
+      max.acf = max.acf
+    )
+    
+    df
+    
+  },
+  error = function(cond) {
+    
+    message("Here's the original error message:")
+    message(cond)
+    # Choose a return value in case of error
+    NA
+  })
+  
+  result
+}
+
+
+
+
+createCrossCorrelationTable <- function(){
+  df <- luftdaten.sensors %>% filter(sensor_type_name == 'SDS011') 
+  
+  df.best.acf <-
+    do.call(rbind, apply(df[, c('sensor_id', 'dwd_station_id','location_id')], 1, function(y)
+      computeCCF(y['sensor_id'], y['dwd_station_id'],y['location_id'])))
+  
+  df.best.acf <- df.best.acf %>% na.omit(.)
+  
+  writeToDB(df.best.acf, 'autocorrelations', overwrite = TRUE)
+  
+}
+
 prepare.data <- function(dwdStationCode = 'None', sensors_id) {
   print('starting preparing data..')
   

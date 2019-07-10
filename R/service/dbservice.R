@@ -6,7 +6,7 @@ library(tidyverse)
 library(lubridate)
 
 
-DB.NAME <- '../data/luftdaten_dwd.db'
+DB.NAME <- 'data/luftdaten_dwd.db'
 
 
 connect_to_db <- function() {
