@@ -1,0 +1,12 @@
+name: air_challenge
+title: air_challenge
+username:
+account: clementlefevre
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 1384310
+bundleId: 2543496
+url: https://clementlefevre.shinyapps.io/air_challenge/
+when: 1572261350.69654
+asMultiple: FALSE
+asStatic: FALSE

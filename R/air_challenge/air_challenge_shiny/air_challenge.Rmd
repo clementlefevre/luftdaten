@@ -1,0 +1,61 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+
+library(ggplot2)
+library(plotly)
+library(data.table)
+source('service/dbservice.R')
+source('sensors_config.R')
+source('service/update_db_from_madavi.R')
+source('service/grafana_api_service.R')
+
+
+DT.madavi.DB <- read_df_from_db('madavi_data') %>% setDT()
+DT.madavi.DB[,datetime:=as.POSIXct(datetime,origin = "1970-01-01")]
+setkey(DT.madavi.DB,sensorId)
+DT.madavi.DB<- DT.sensors[DT.madavi.DB]
+DT.madavi.DB$aqi.good <- 13
+```
+
+```{r}
+  df<- as.data.frame(DT.madavi.DB)
+
+  df$name<- factor(df$name,levels=c('clement','thibaut','mathilde'))
+  
+  internet_1 <- list(
+    xref = 'datetime',
+    yref = 'value',
+    x = max(df$datetime),
+    y = 18,
+    xanchor = 'right',
+    yanchor = 'middle',
+    text = ~paste('Good Air Quality Threshold' ),
+    font = list(family = 'Arial',
+                size = 12,
+                color = '#8590aa'),
+    showarrow = FALSE)
+  
+  
+  pal <- c("#2c7fb8", "#2ca25f", "#dd1c77")
+  p1 <- plot_ly(df, x=~datetime, y=~SDS_P2, color=~name, colors =pal,
+                type = 'scatter', mode = "lines",line=list(width=1),legendgroup=~name,showlegend=TRUE) %>% 
+    layout(yaxis = list(title = "Particles Matters (µg/m3)")) %>% add_trace(data=df %>% filter(name=='clement'),y=~aqi.good, name='Air Quality OK (WHO)', showlegend=FALSE, 
+              type='scatter', mode='lines',
+              line = list(color = '#8590aa', width = 1, dash = 'dash'))%>% layout(annotations = internet_1) 
+  
+  p2<- plot_ly(df, x=~datetime, y=~BME280_humidity, color=~name, colors =pal,
+               type = 'scatter', mode = "lines",line=list(width=1),legendgroup=~name,showlegend=FALSE) %>% 
+    layout(yaxis = list(title = "Humidity (%)")) 
+  
+  p <- subplot(p1, p2, nrows = 2,shareX = TRUE, titleY = TRUE,titleX = FALSE)
+  p
+```
+
